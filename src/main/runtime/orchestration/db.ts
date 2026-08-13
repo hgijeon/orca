@@ -4566,16 +4566,44 @@ export class OrchestrationDb {
          FROM federated_dispatches fd
          INNER JOIN dispatch_contexts dc ON dc.id = fd.dispatch_id
          INNER JOIN worker_dispatches wd ON wd.dispatch_id = fd.dispatch_id
-         WHERE (
-             wd.state IN ('starting', 'ready', 'stopping', 'start_unknown', 'stop_unknown')
-             OR (
-               fd.to_home_acknowledged_sequence < fd.to_home_imported_sequence
-             )
-           )
+         WHERE wd.state IN ('starting', 'ready', 'stopping', 'start_unknown', 'stop_unknown')
            AND (? IS NULL OR dc.run_id = ?)
          ORDER BY fd.rowid`
       )
       .all(runId ?? null, runId ?? null) as FederatedDispatchRow[]
+  }
+
+  findNextTerminalFederatedDispatchPendingAcknowledgment(
+    afterRowId: number
+  ): { dispatchId: string; rowId: number } | undefined {
+    return this.db
+      .prepare(
+        `SELECT fd.dispatch_id AS dispatchId, fd.rowid AS rowId
+         FROM federated_dispatches fd
+         INNER JOIN worker_dispatches wd ON wd.dispatch_id = fd.dispatch_id
+         WHERE wd.state NOT IN ('starting', 'ready', 'stopping', 'start_unknown', 'stop_unknown')
+           AND fd.to_home_acknowledged_sequence < fd.to_home_imported_sequence
+           AND fd.rowid > ?
+         ORDER BY fd.rowid
+         LIMIT 1`
+      )
+      .get(afterRowId) as { dispatchId: string; rowId: number } | undefined
+  }
+
+  findLatestTerminalFederatedDispatchPendingAcknowledgment():
+    | { dispatchId: string; rowId: number }
+    | undefined {
+    return this.db
+      .prepare(
+        `SELECT fd.dispatch_id AS dispatchId, fd.rowid AS rowId
+         FROM federated_dispatches fd
+         INNER JOIN worker_dispatches wd ON wd.dispatch_id = fd.dispatch_id
+         WHERE wd.state NOT IN ('starting', 'ready', 'stopping', 'start_unknown', 'stop_unknown')
+           AND fd.to_home_acknowledged_sequence < fd.to_home_imported_sequence
+         ORDER BY fd.rowid DESC
+         LIMIT 1`
+      )
+      .get() as { dispatchId: string; rowId: number } | undefined
   }
 
   isFederatedDispatchRelayEligible(dispatchId: string): boolean {

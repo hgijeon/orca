@@ -2702,6 +2702,12 @@ export class OrcaRuntimeService {
   private managedHookReconciliationTail: Promise<void> = Promise.resolve()
   private readonly orchestrationEnvironmentTransport: OrchestrationEnvironmentTransport | null
   private readonly orchestrationFederationTimers = new Map<string, ReturnType<typeof setInterval>>()
+  private orchestrationTerminalHistoryRecoveryTimer: ReturnType<typeof setTimeout> | null = null
+  private orchestrationTerminalHistoryRecoveryInFlight: Promise<void> | null = null
+  private orchestrationLatestTerminalRecoveryTimer: ReturnType<typeof setTimeout> | null = null
+  private orchestrationLatestTerminalRecoveryInFlight: Promise<void> | null = null
+  private orchestrationTerminalRecoveryRowId = 0
+  private orchestrationFederationRelayGeneration = 0
   private readonly orchestrationFederationSyncs = new Map<
     string,
     { db: OrchestrationDb; promise: Promise<void> }
@@ -4736,13 +4742,116 @@ export class OrcaRuntimeService {
       this.orchestrationFederationTimers.set(dispatch.dispatch_id, timer)
       tick()
     }
+    this.ensureTerminalFederationAcknowledgmentRecovery()
+  }
+
+  private ensureTerminalFederationAcknowledgmentRecovery(): void {
+    if (!this.orchestrationEnvironmentTransport) {
+      return
+    }
+    this.ensureTerminalHistoryRecovery()
+    this.ensureLatestTerminalRecovery()
+  }
+
+  private ensureTerminalHistoryRecovery(): void {
+    if (
+      this.orchestrationTerminalHistoryRecoveryTimer ||
+      this.orchestrationTerminalHistoryRecoveryInFlight
+    ) {
+      return
+    }
+    const generation = this.orchestrationFederationRelayGeneration
+    const recovery = this.recoverNextTerminalHistoryAcknowledgment(generation).catch((error) => {
+      console.warn('[orchestration] terminal federation acknowledgment recovery failed', error)
+    })
+    this.orchestrationTerminalHistoryRecoveryInFlight = recovery
+    void recovery.finally(() => {
+      if (this.orchestrationTerminalHistoryRecoveryInFlight === recovery) {
+        this.orchestrationTerminalHistoryRecoveryInFlight = null
+      }
+    })
+  }
+
+  private async recoverNextTerminalHistoryAcknowledgment(generation: number): Promise<void> {
+    const db = this.getOrchestrationDb()
+    let historical = db.findNextTerminalFederatedDispatchPendingAcknowledgment(
+      this.orchestrationTerminalRecoveryRowId
+    )
+    if (!historical && this.orchestrationTerminalRecoveryRowId > 0) {
+      this.orchestrationTerminalRecoveryRowId = 0
+      historical = db.findNextTerminalFederatedDispatchPendingAcknowledgment(0)
+    }
+    if (!historical) {
+      return
+    }
+    this.orchestrationTerminalRecoveryRowId = historical.rowId
+    await this.syncOrchestrationFederatedDispatch(historical.dispatchId).catch(() => undefined)
+    if (generation !== this.orchestrationFederationRelayGeneration) {
+      return
+    }
+    this.orchestrationTerminalHistoryRecoveryTimer = setTimeout(() => {
+      this.orchestrationTerminalHistoryRecoveryTimer = null
+      this.ensureTerminalHistoryRecovery()
+    }, 1_000)
+    this.orchestrationTerminalHistoryRecoveryTimer.unref?.()
+  }
+
+  private ensureLatestTerminalRecovery(): void {
+    if (
+      this.orchestrationLatestTerminalRecoveryTimer ||
+      this.orchestrationLatestTerminalRecoveryInFlight
+    ) {
+      return
+    }
+    const generation = this.orchestrationFederationRelayGeneration
+    const recovery = this.recoverLatestTerminalAcknowledgment(generation).catch((error) => {
+      console.warn(
+        '[orchestration] latest terminal federation acknowledgment recovery failed',
+        error
+      )
+    })
+    this.orchestrationLatestTerminalRecoveryInFlight = recovery
+    void recovery.finally(() => {
+      if (this.orchestrationLatestTerminalRecoveryInFlight === recovery) {
+        this.orchestrationLatestTerminalRecoveryInFlight = null
+      }
+    })
+  }
+
+  private async recoverLatestTerminalAcknowledgment(generation: number): Promise<void> {
+    const latest =
+      this.getOrchestrationDb().findLatestTerminalFederatedDispatchPendingAcknowledgment()
+    if (!latest) {
+      return
+    }
+    await this.syncOrchestrationFederatedDispatch(latest.dispatchId).catch(() => undefined)
+    if (generation !== this.orchestrationFederationRelayGeneration) {
+      return
+    }
+    this.orchestrationLatestTerminalRecoveryTimer = setTimeout(() => {
+      this.orchestrationLatestTerminalRecoveryTimer = null
+      this.ensureLatestTerminalRecovery()
+    }, 1_000)
+    this.orchestrationLatestTerminalRecoveryTimer.unref?.()
   }
 
   stopOrchestrationFederationRelay(): void {
+    this.orchestrationFederationRelayGeneration += 1
     for (const timer of this.orchestrationFederationTimers.values()) {
       clearInterval(timer)
     }
     this.orchestrationFederationTimers.clear()
+    if (this.orchestrationTerminalHistoryRecoveryTimer) {
+      clearTimeout(this.orchestrationTerminalHistoryRecoveryTimer)
+      this.orchestrationTerminalHistoryRecoveryTimer = null
+    }
+    if (this.orchestrationLatestTerminalRecoveryTimer) {
+      clearTimeout(this.orchestrationLatestTerminalRecoveryTimer)
+      this.orchestrationLatestTerminalRecoveryTimer = null
+    }
+    this.orchestrationTerminalHistoryRecoveryInFlight = null
+    this.orchestrationLatestTerminalRecoveryInFlight = null
+    this.orchestrationTerminalRecoveryRowId = 0
     this.orchestrationFederationWarnings.clear()
     this.orchestrationFederationSyncs.clear()
     clearFederationAckCheckpoints(this)

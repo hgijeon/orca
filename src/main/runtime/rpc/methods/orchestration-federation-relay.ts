@@ -3,6 +3,7 @@ import { ORCHESTRATION_FEDERATION_CONTROL_MAIL_PROTOCOL_VERSION } from '../../..
 import { importFederatedControlMessage } from '../../orchestration/federation-control-message'
 import { OrchestrationError } from '../../orchestration/orchestration-error'
 import {
+  areFederatedLifecycleSettlementsEqual,
   publishFederatedLifecycleSettlement,
   type FederatedLifecycleSettlement
 } from '../../orchestration/federation-lifecycle-settlement'
@@ -87,7 +88,10 @@ export const ORCHESTRATION_FEDERATION_RELAY_METHODS: RpcMethod[] = [
       const settlementsBySequence = new Map<number, (typeof receivedSettlements)[number]>()
       for (const settlement of receivedSettlements) {
         const existing = settlementsBySequence.get(settlement.sequence)
-        if (existing && existing.lifecycle.action !== settlement.lifecycle.action) {
+        if (
+          existing &&
+          !areFederatedLifecycleSettlementsEqual(existing.lifecycle, settlement.lifecycle)
+        ) {
           throw new OrchestrationError(
             'request_mismatch',
             `Federation acknowledgment for ${params.dispatchId} contains conflicting settlements.`
