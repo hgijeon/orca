@@ -75,6 +75,19 @@ export function mergeAiVaultListResults(
       .sort((left, right) => sessionSortTime(right) - sessionSortTime(left))
       .slice(0, limit),
     issues,
-    scannedAt: new Date().toISOString()
+    // Why: a merge is not a new scan. Reminting here made every all-host cache
+    // hit look fresh to the renderer, which only skipped apply when scannedAt
+    // matched. Keep the latest input stamp so identical legs stay a no-op.
+    scannedAt: latestAiVaultScannedAt(results)
   }
+}
+
+function latestAiVaultScannedAt(results: readonly AiVaultListResult[]): string {
+  let latest: string | undefined
+  for (const result of results) {
+    if (latest === undefined || result.scannedAt > latest) {
+      latest = result.scannedAt
+    }
+  }
+  return latest ?? new Date().toISOString()
 }

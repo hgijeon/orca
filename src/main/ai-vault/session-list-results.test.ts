@@ -46,6 +46,18 @@ const SCOPE_TRUNCATION: AiVaultScanIssue = {
 }
 
 describe('mergeAiVaultListResults', () => {
+  it('keeps the latest input scannedAt instead of restamping the merge', () => {
+    const merged = mergeAiVaultListResults(
+      [
+        { ...listResult([]), scannedAt: '2026-08-02T00:00:00.000Z' },
+        { ...listResult([]), scannedAt: '2026-08-02T00:00:05.000Z' }
+      ],
+      undefined
+    )
+
+    expect(merged.scannedAt).toBe('2026-08-02T00:00:05.000Z')
+  })
+
   it('does not cap an Unlimited all-host merge', () => {
     const sessions = Array.from({ length: 1001 }, (_, index) => session(index))
     const merged = mergeAiVaultListResults([{ ...listResult([]), sessions }], undefined, true)

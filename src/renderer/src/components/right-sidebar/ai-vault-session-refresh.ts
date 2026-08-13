@@ -8,6 +8,7 @@ import type { ExecutionHostScope } from '../../../../shared/execution-host'
 import { useAppStore } from '@/store'
 import type { AiVaultSessionLimit } from './ai-vault-session-limit'
 import { AiVaultSessionPublicationGate } from './ai-vault-session-publication-gate'
+import { applyPublishedAiVaultList } from './ai-vault-session-identity'
 import {
   aiVaultSessionResultCacheKey,
   cacheAiVaultSessionResult,
@@ -92,8 +93,7 @@ export function useAiVaultSessionRefresh(
         lastAppliedScanRef.current = { scopeKey: scanKey, scannedAt: cachedResult.scannedAt }
         setError(null)
         publicationGateRef.current.publish(cachedResult, (published) => {
-          setScanResult(published)
-          setSessions(published.sessions)
+          applyPublishedAiVaultList(published, setScanResult, setSessions)
         })
         setLoading(false)
         return
@@ -161,8 +161,7 @@ export function useAiVaultSessionRefresh(
         })
         publicationGateRef.current.publish(result, (published) => {
           if (mountedRef.current && scanKey === currentScanScopeKey()) {
-            setScanResult(published)
-            setSessions(published.sessions)
+            applyPublishedAiVaultList(published, setScanResult, setSessions)
           }
         })
       } catch (err) {
