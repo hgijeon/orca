@@ -462,7 +462,8 @@ export type PtyBindingSourceExpectation = {
 }
 
 export class Store {
-  private state: PersistedState
+  // Why readonly: the operations wrappers below capture this reference once and are memoized.
+  private readonly state: PersistedState
   private readonly dataFile: string
   private readonly activeViewPreference: ActiveViewPreference
   private readonly terminalScrollbackSnapshotStorage: TerminalScrollbackSnapshotStorage
@@ -487,7 +488,7 @@ export class Store {
   private githubCacheGeneration = 0
   private pendingGithubCacheWrite: Promise<void> | null = null
   private readonly staleGithubCacheTempCleanup: Promise<void>
-  private gitUsernameCache = new Map<string, string>()
+  private readonly gitUsernameCache = new Map<string, string>()
   private readonly protectedSecrets = new ProtectedSecretPersistence()
   private loadNeedsSave = false
   private settingsChangeListeners = new Set<
@@ -1899,8 +1900,10 @@ export class Store {
 
   // ── Repos ──────────────────────────────────────────────────────────
 
+  private projectHostOperations: ProjectHostPersistenceOperations | null = null
+
   private getProjectHostOperations(): ProjectHostPersistenceOperations {
-    return new ProjectHostPersistenceOperations({
+    this.projectHostOperations ??= new ProjectHostPersistenceOperations({
       state: this.state,
       gitUsernameCache: this.gitUsernameCache,
       hydrateRepo: (repo) => this.hydrateRepo(repo),
@@ -1911,6 +1914,7 @@ export class Store {
       removeProjectForHost: (id, hostId) => this.removeProjectForHost(id, hostId),
       scheduleSave: () => this.scheduleSave()
     })
+    return this.projectHostOperations
   }
 
   getRepos(): Repo[] {
@@ -1953,8 +1957,10 @@ export class Store {
     return this.getProjectHostOperations().setResolvedRepoGitUsername(id, username)
   }
 
+  private projectGroupOperations: ProjectGroupPersistenceOperations | null = null
+
   private getProjectGroupOperations(): ProjectGroupPersistenceOperations {
-    return new ProjectGroupPersistenceOperations({
+    this.projectGroupOperations ??= new ProjectGroupPersistenceOperations({
       state: this.state,
       scheduleSave: () => this.scheduleSave(),
       removeWorkspaceLineageForFolderParent: (folderWorkspaceId) =>
@@ -1962,6 +1968,7 @@ export class Store {
       pruneMobileClientTabSelections: (matchesWorktreeId) =>
         this.pruneMobileClientTabSelections(matchesWorktreeId)
     })
+    return this.projectGroupOperations
   }
 
   getProjectGroups(): ProjectGroup[] {
@@ -1985,8 +1992,10 @@ export class Store {
     return this.getProjectGroupOperations().deleteProjectGroup(groupId)
   }
 
+  private folderWorkspaceOperations: FolderWorkspacePersistenceOperations | null = null
+
   private getFolderWorkspaceOperations(): FolderWorkspacePersistenceOperations {
-    return new FolderWorkspacePersistenceOperations({
+    this.folderWorkspaceOperations ??= new FolderWorkspacePersistenceOperations({
       state: this.state,
       scheduleSave: () => this.scheduleSave(),
       removeWorkspaceLineageForFolderParent: (folderWorkspaceId) =>
@@ -1995,6 +2004,7 @@ export class Store {
         this.pruneMobileClientTabSelections(matchesWorktreeId),
       hydrateRepo: (repo) => this.hydrateRepo(repo)
     })
+    return this.folderWorkspaceOperations
   }
 
   getFolderWorkspaces(): FolderWorkspace[] {
@@ -2026,12 +2036,15 @@ export class Store {
     return this.getFolderWorkspaceOperations().moveProjectToGroup(repoId, groupId, order)
   }
 
+  private repoOrderOperations: RepoOrderPersistenceOperations | null = null
+
   private getRepoOrderOperations(): RepoOrderPersistenceOperations {
-    return new RepoOrderPersistenceOperations({
+    this.repoOrderOperations ??= new RepoOrderPersistenceOperations({
       state: this.state,
       syncProjectHostSetupCompatibilityState: () => this.syncProjectHostSetupCompatibilityState(),
       scheduleSave: () => this.scheduleSave()
     })
+    return this.repoOrderOperations
   }
 
   addRepo(repo: Repo): void {
@@ -2113,13 +2126,16 @@ export class Store {
     }
   }
 
+  private repoUpdateOperations: RepoUpdatePersistenceOperations | null = null
+
   private getRepoUpdateOperations(): RepoUpdatePersistenceOperations {
-    return new RepoUpdatePersistenceOperations({
+    this.repoUpdateOperations ??= new RepoUpdatePersistenceOperations({
       state: this.state,
       syncProjectHostSetupCompatibilityState: () => this.syncProjectHostSetupCompatibilityState(),
       scheduleSave: () => this.scheduleSave(),
       hydrateRepo: (repo) => this.hydrateRepo(repo)
     })
+    return this.repoUpdateOperations
   }
 
   updateRepo(
@@ -2164,12 +2180,15 @@ export class Store {
     this.state.projectHostSetups = compatibilityState.projectHostSetups
   }
 
+  private projectHostSetupOperations: ProjectHostSetupPersistenceOperations | null = null
+
   private getProjectHostSetupOperations(): ProjectHostSetupPersistenceOperations {
-    return new ProjectHostSetupPersistenceOperations({
+    this.projectHostSetupOperations ??= new ProjectHostSetupPersistenceOperations({
       state: this.state,
       updateRepo: (id, updates, hostId) => this.updateRepo(id, updates, hostId),
       scheduleSave: () => this.scheduleSave()
     })
+    return this.projectHostSetupOperations
   }
 
   private updateRepoBackedProjectHostSetup(

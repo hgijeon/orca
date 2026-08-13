@@ -1,4 +1,4 @@
-import type { GlobalSettings, PersistedState } from '../../shared/types'
+import type { GlobalSettings } from '../../shared/types'
 import { normalizeDisabledTuiAgents } from '../../shared/tui-agent-selection'
 import {
   normalizeTuiAgentArgsRecord,
@@ -15,6 +15,7 @@ import { normalizeSourceControlGroupOrder } from '../../shared/source-control-gr
 import { normalizeAppIconId } from '../../shared/app-icon'
 import { normalizeUiLanguage } from '../../shared/ui-language'
 import { normalizePRBotAuthorOverrides } from '../../shared/pr-bot-author-overrides'
+import type { StoreOwnedPersistedState } from './persistence-store-owned-state'
 import {
   addMobilePairingCustomAddress,
   normalizeMobilePairingCustomAddress,
@@ -37,7 +38,7 @@ import {
 } from './persistence-terminal-settings-migrations'
 
 export type SettingsMutationOperations = {
-  state: PersistedState
+  state: StoreOwnedPersistedState
   removeRetainedBlob: (
     slot: Parameters<ProtectedSecretPersistence['removeRetainedBlob']>[0]
   ) => void
