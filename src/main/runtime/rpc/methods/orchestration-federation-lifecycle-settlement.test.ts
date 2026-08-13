@@ -642,10 +642,13 @@ describe('orchestration federation lifecycle settlement', () => {
         params: {
           dispatchId: dispatch.id,
           throughSequence: reports[1].sequence,
-          settlements: reports.map((report) => ({
-            sequence: report.sequence,
-            lifecycle: { action: 'completed', authority: 'run_home' }
-          }))
+          settlements: reports.flatMap((report) => {
+            const settlement = {
+              sequence: report.sequence,
+              lifecycle: { action: 'completed' as const, authority: 'run_home' as const }
+            }
+            return [settlement, settlement]
+          })
         }
       })
     ).resolves.toMatchObject({ ok: true, result: { acknowledgedThrough: reports[1].sequence } })

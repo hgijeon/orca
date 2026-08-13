@@ -81,16 +81,21 @@ export const ORCHESTRATION_FEDERATION_RELAY_METHODS: RpcMethod[] = [
     params: FederationAckParams,
     handler: (params, { runtime, authenticatedCallerFingerprint }) => {
       requireHomeAttachment(runtime, params.dispatchId, authenticatedCallerFingerprint)
-      const settlements = (params.settlements ?? []).filter(
+      const receivedSettlements = (params.settlements ?? []).filter(
         (settlement) => settlement.sequence <= params.throughSequence
       )
-      const settlementSequences = new Set(settlements.map((settlement) => settlement.sequence))
-      if (settlementSequences.size !== settlements.length) {
-        throw new OrchestrationError(
-          'request_mismatch',
-          `Federation acknowledgment for ${params.dispatchId} contains duplicate settlement sequences.`
-        )
+      const settlementsBySequence = new Map<number, (typeof receivedSettlements)[number]>()
+      for (const settlement of receivedSettlements) {
+        const existing = settlementsBySequence.get(settlement.sequence)
+        if (existing && existing.lifecycle.action !== settlement.lifecycle.action) {
+          throw new OrchestrationError(
+            'request_mismatch',
+            `Federation acknowledgment for ${params.dispatchId} contains conflicting settlements.`
+          )
+        }
+        settlementsBySequence.set(settlement.sequence, existing ?? settlement)
       }
+      const settlements = [...settlementsBySequence.values()]
       const terminalSettlements = settlements.filter(
         (settlement) =>
           settlement.lifecycle.action === 'completed' || settlement.lifecycle.action === 'failed'
