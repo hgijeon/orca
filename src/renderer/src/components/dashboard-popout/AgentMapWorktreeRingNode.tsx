@@ -14,6 +14,7 @@ import type {
   AgentMapWorktreeRing
 } from './agent-map-layout'
 import { AGENT_MAP_LINEAGE_RELATION, shouldAggregateAgentMapWorktree } from './agent-map-layout'
+import { AgentMapQuestionMarker } from './AgentMapQuestionMarker'
 import { agentMapDirectLineageChevronPath } from './agent-map-lineage-chevron-path'
 import { agentMapWorktreeActiveStatus } from './agent-map-worktree-active-status'
 
@@ -382,6 +383,12 @@ export const AgentMapWorktreeRingNode = memo(function AgentMapWorktreeRingNode({
                         r={agent.radius * 0.225 * agentMapAttentionMarkerScale(mapScale)}
                         vectorEffect="none"
                         aria-hidden="true"
+                      />
+                    ) : null}
+                    {agent.status === 'waiting' ? (
+                      <AgentMapQuestionMarker
+                        radius={agent.radius}
+                        markerScale={agentMapAttentionMarkerScale(mapScale)}
                       />
                     ) : null}
                   </g>
