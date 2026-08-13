@@ -2,9 +2,11 @@ import type { AiVaultListResult, AiVaultSession } from '../../../../shared/ai-va
 import { areValuesEqual } from '@/store/slices/repo-identity-reconcile'
 import { reuseEqualCatalogRows } from '@/store/slices/worktree-catalog-reconciliation'
 
+export const EMPTY_AI_VAULT_SESSIONS: AiVaultSession[] = []
+
 // Why: listSessions always structured-clones nested session rows (previewMessages,
-// subagent). mergeAiVaultListResults also remints scannedAt on every all-host merge,
-// and a TTL miss remints it even when the disk contents did not change. The panel
+// subagent). A TTL miss remints scannedAt even when the disk contents did not
+// change, and all-host merge used to remint it even on cache-hit legs. The panel
 // only skipped apply when scannedAt matched, so alt-tab after 15s rebuilt
 // sessionProjectById + the worktree path map for every row. Reuse previous row
 // and result identity when the payload is structurally unchanged so those memos
@@ -36,9 +38,7 @@ export function reuseAiVaultListResult(
 
 export function applyPublishedAiVaultList(
   published: AiVaultListResult,
-  setScanResult: (updater: (prev: AiVaultListResult | null) => AiVaultListResult) => void,
-  setSessions: (updater: (prev: AiVaultSession[]) => AiVaultSession[]) => void
+  setScanResult: (updater: (prev: AiVaultListResult | null) => AiVaultListResult) => void
 ): void {
   setScanResult((prev) => reuseAiVaultListResult(prev, published))
-  setSessions((prev) => reuseEqualCatalogRows(prev, published.sessions))
 }

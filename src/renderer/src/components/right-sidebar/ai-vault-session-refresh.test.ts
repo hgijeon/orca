@@ -538,6 +538,35 @@ describe('useAiVaultSessionRefresh refocus behavior', () => {
     expect(latest?.sessions[1]).toBe(appliedSessions?.[1])
   })
 
+  it('appends a new session on refocus and keeps the surviving row identity', async () => {
+    const first: AiVaultListResult = {
+      sessions: [makeVaultSession(1)],
+      issues: [],
+      scannedAt: '2026-07-01T00:00:00.000Z'
+    }
+    listSessionsMock.mockResolvedValueOnce(first)
+    await renderHook()
+    await flushMicrotasks()
+    const surviving = latest?.sessions[0]
+    const previous = first.sessions[0]
+    expect(surviving?.id).toBe('session-1')
+    if (!previous) {
+      throw new Error('expected the first scan to include a session')
+    }
+
+    listSessionsMock.mockResolvedValueOnce({
+      sessions: [structuredClone(previous), makeVaultSession(2)],
+      issues: [],
+      scannedAt: '2026-07-01T00:00:15.000Z'
+    })
+    await advance(THROTTLE_MS + 1)
+    await fireWindowFocused()
+
+    expect(latest?.sessions).toHaveLength(2)
+    expect(latest?.sessions[0]).toBe(surviving)
+    expect(latest?.sessions[1]?.id).toBe('session-2')
+  })
+
   it('keeps the current list when a superseded scan resolves cancelled', async () => {
     await renderHook()
     await flushMicrotasks()

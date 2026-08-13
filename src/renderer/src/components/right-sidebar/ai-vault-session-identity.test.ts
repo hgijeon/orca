@@ -108,4 +108,27 @@ describe('reuseAiVaultListResult', () => {
     expect(reused.sessions[1]?.previewMessages[0]?.text).toBe('a new user turn')
     expect(reused.scannedAt).toBe('2026-07-01T00:00:15.000Z')
   })
+
+  it('replaces issues when sessions are unchanged', () => {
+    const hostIssue = {
+      executionHostId: 'ssh:dev-box' as const,
+      agent: 'codex' as const,
+      kind: 'host' as const,
+      path: 'dev-box',
+      message: 'Remote connection dropped.'
+    }
+    const current: AiVaultListResult = {
+      sessions: [makeProductionSession(1)],
+      issues: [hostIssue],
+      scannedAt: '2026-07-01T00:00:00.000Z'
+    }
+    const incoming = cloneResult(current, '2026-07-01T00:00:15.000Z')
+    incoming.issues = []
+
+    const reused = reuseAiVaultListResult(current, incoming)
+    expect(reused).not.toBe(current)
+    expect(reused.sessions).toBe(current.sessions)
+    expect(reused.issues).toEqual([])
+    expect(reused.issues).toBe(incoming.issues)
+  })
 })
