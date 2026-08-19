@@ -5,13 +5,18 @@ import { requestScrollToCurrentWorkspaceRevealAndRename } from '@/lib/scroll-to-
 import { showTerminalShortcutCaptureNotification } from '@/lib/terminal-shortcut-capture-notification'
 import { shouldShowWorktreeHistoryControls } from '../lib/titlebar-worktree-history-controls'
 import { TOGGLE_WORKSPACE_BOARD_EVENT } from '../components/sidebar/useWorkspaceBoardPanel'
+import {
+  moveTabToNewPaneColumn,
+  resolveActiveTabPaneColumnMoveTarget
+} from '../components/tab-bar/tab-move-to-pane-column'
 import { useAppStore } from '../store'
 import type { usePluginCommands } from '@/store/plugin-panels'
 import { isGitRepoKind } from '../../../shared/repo-kind'
-import type {
-  KeybindingActionId,
-  KeybindingContext,
-  PhysicalModifierToken
+import {
+  TAB_MOVE_TO_SPLIT_COMMANDS,
+  type KeybindingActionId,
+  type KeybindingContext,
+  type PhysicalModifierToken
 } from '../../../shared/keybindings'
 import { shortcutPlatform } from './app-window-chrome'
 
@@ -112,6 +117,17 @@ export function createAppCommandHandlers(
     run()
     return true
   }
+  // Why: an unmovable tab (alone in its group) must not swallow the chord — fall through instead.
+  const claimMoveTabToSplit = ({
+    id,
+    direction
+  }: (typeof TAB_MOVE_TO_SPLIT_COMMANDS)[number]): boolean => {
+    if (!workspaceChromeActive || floatingWorkspaceFocused) {
+      return false
+    }
+    const target = resolveActiveTabPaneColumnMoveTarget(useAppStore.getState())
+    return target ? claim(id, () => moveTabToNewPaneColumn({ target, direction })) : false
+  }
   const revealRightSidebarTab = (
     actionId: KeybindingActionId,
     tab: Parameters<AppShortcutActions['setRightSidebarTab']>[0]
@@ -179,6 +195,9 @@ export function createAppCommandHandlers(
         return claim('tab.rename', () => store.setRenamingTabId(store.activeTabId!))
       }
     ],
+    ...TAB_MOVE_TO_SPLIT_COMMANDS.map(
+      (command) => [command.id, () => claimMoveTabToSplit(command)] as const
+    ),
     [
       'workspace.rename',
       () => {

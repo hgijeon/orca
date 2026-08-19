@@ -22,6 +22,7 @@ import { usePluginCommands } from '@/store/plugin-panels'
 import { useAppStore } from '../store'
 import {
   keybindingMatchesAction,
+  TAB_MOVE_TO_SPLIT_COMMANDS,
   type KeybindingActionId,
   type KeybindingMatchOptions
 } from '../../../shared/keybindings'
@@ -237,6 +238,15 @@ export function useGlobalKeybindings(args: {
 
       const handlers = createAppCommandHandlers(state, input, context)
       for (const actionId of PLUGIN_COMMAND_ALIAS_ACTION_IDS) {
+        if (matchShortcut(actionId) && handlers.get(actionId)?.()) {
+          return
+        }
+      }
+
+      // Unbound by default like sourceControl.sendReviewNotes below, and deliberately outside
+      // PLUGIN_COMMAND_ALIAS_ACTION_IDS — that list is the closed set plugins may alias, not the
+      // dispatch table. The handler returns false when the tab cannot move, so the chord falls through.
+      for (const { id: actionId } of TAB_MOVE_TO_SPLIT_COMMANDS) {
         if (matchShortcut(actionId) && handlers.get(actionId)?.()) {
           return
         }
