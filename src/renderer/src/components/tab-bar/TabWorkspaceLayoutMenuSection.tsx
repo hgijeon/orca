@@ -1,5 +1,6 @@
 import {
   DropdownMenuSeparator,
+  DropdownMenuShortcut,
   DropdownMenuSub,
   DropdownMenuSubContent,
   DropdownMenuSubTrigger,
@@ -8,10 +9,31 @@ import {
 import { ArrowDown, ArrowLeft, ArrowRight, ArrowUp, Columns2 } from 'lucide-react'
 import type { TabSplitDirection } from '../../store/slices/tabs'
 import { translate } from '@/i18n/i18n'
-import { canMoveTabToNewPaneColumn, moveTabToNewPaneColumn } from './tab-move-to-pane-column'
+import { useAppStore } from '../../store'
+import { moveTabToNewPaneColumn, resolveTabPaneColumnMoveTarget } from './tab-move-to-pane-column'
 import { TAB_CONTEXT_SUBMENU_CONTENT_CLASS } from './tab-context-menu-sizing'
+import { useOptionalShortcutLabel } from '@/hooks/useShortcutLabel'
+import { TAB_MOVE_TO_SPLIT_COMMANDS, type KeybindingActionId } from '../../../../shared/keybindings'
 
-const PANE_COLUMN_DIRECTIONS: TabSplitDirection[] = ['right', 'left', 'down', 'up']
+// Why: the action is discovered here, so a chord the user assigned has to be visible here too.
+function PaneColumnDirectionItem({
+  actionId,
+  direction,
+  onSelect
+}: {
+  actionId: KeybindingActionId
+  direction: TabSplitDirection
+  onSelect: () => void
+}): React.JSX.Element {
+  const shortcut = useOptionalShortcutLabel(actionId)
+  return (
+    <DropdownMenuItem onSelect={onSelect}>
+      {paneColumnDirectionIcon(direction)}
+      {paneColumnDirectionLabel(direction)}
+      {shortcut ? <DropdownMenuShortcut>{shortcut}</DropdownMenuShortcut> : null}
+    </DropdownMenuItem>
+  )
+}
 
 function paneColumnDirectionIcon(direction: TabSplitDirection): React.JSX.Element {
   switch (direction) {
@@ -48,7 +70,8 @@ export function TabWorkspaceLayoutMenuSection({
   groupId: string
   trailingSeparator?: boolean
 }): React.JSX.Element | null {
-  if (!canMoveTabToNewPaneColumn(unifiedTabId, groupId)) {
+  const target = resolveTabPaneColumnMoveTarget(useAppStore.getState(), unifiedTabId, groupId)
+  if (!target) {
     return null
   }
 
@@ -63,16 +86,15 @@ export function TabWorkspaceLayoutMenuSection({
           )}
         </DropdownMenuSubTrigger>
         <DropdownMenuSubContent className={TAB_CONTEXT_SUBMENU_CONTENT_CLASS}>
-          {PANE_COLUMN_DIRECTIONS.map((direction) => (
-            <DropdownMenuItem
-              key={direction}
+          {TAB_MOVE_TO_SPLIT_COMMANDS.map(({ id, direction }) => (
+            <PaneColumnDirectionItem
+              key={id}
+              actionId={id}
+              direction={direction}
               onSelect={() => {
-                moveTabToNewPaneColumn({ unifiedTabId, groupId, direction })
+                moveTabToNewPaneColumn({ target, direction })
               }}
-            >
-              {paneColumnDirectionIcon(direction)}
-              {paneColumnDirectionLabel(direction)}
-            </DropdownMenuItem>
+            />
           ))}
         </DropdownMenuSubContent>
       </DropdownMenuSub>

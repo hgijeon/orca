@@ -68,6 +68,10 @@ export type KeybindingActionId =
   | 'tab.closeAll'
   | 'tab.rename'
   | 'tab.reopenClosed'
+  | 'tab.moveToSplitRight'
+  | 'tab.moveToSplitLeft'
+  | 'tab.moveToSplitUp'
+  | 'tab.moveToSplitDown'
   | 'tab.nextSameType'
   | 'tab.previousSameType'
   | 'tab.nextAllTypes'
@@ -118,6 +122,16 @@ export type KeybindingActionId =
   | PluginKeybindingActionId
 
 export type KeybindingOverrides = Partial<Record<KeybindingActionId, string[]>>
+
+export const TAB_MOVE_TO_SPLIT_COMMANDS = [
+  { id: 'tab.moveToSplitRight', direction: 'right' },
+  { id: 'tab.moveToSplitLeft', direction: 'left' },
+  { id: 'tab.moveToSplitDown', direction: 'down' },
+  { id: 'tab.moveToSplitUp', direction: 'up' }
+] as const satisfies readonly {
+  id: KeybindingActionId
+  direction: 'right' | 'left' | 'down' | 'up'
+}[]
 
 export type KeybindingFileDiagnostic = {
   severity: 'warning' | 'error'
@@ -633,6 +647,7 @@ export const KEYBINDING_DEFINITIONS: readonly KeybindingDefinition[] = [
     searchKeywords: ['shortcut', 'tab', 'reopen', 'restore', 'closed'],
     defaultBindings: platformBindings(['Mod+Shift+T'])
   },
+  ...buildTabMoveToSplitKeybindingDefinitions(),
   {
     id: 'tab.nextSameType',
     title: 'Next tab (same type)',
@@ -1132,6 +1147,19 @@ function buildAgentTabKeybindingDefinitions(): KeybindingDefinition[] {
       agent,
       TUI_AGENT_DISPLAY_NAMES[agent].toLowerCase()
     ],
+    defaultBindings: platformBindings([])
+  }))
+}
+
+function buildTabMoveToSplitKeybindingDefinitions(): KeybindingDefinition[] {
+  return TAB_MOVE_TO_SPLIT_COMMANDS.map(({ id, direction }) => ({
+    id,
+    title: `Move tab to split ${direction}`,
+    group: 'Tabs',
+    scope: 'tabs',
+    // Why: these run in global capture, so Settings must warn when an earlier global action owns the chord.
+    conflictGroup: 'global',
+    searchKeywords: ['shortcut', 'tab', 'split', 'move', direction],
     defaultBindings: platformBindings([])
   }))
 }
