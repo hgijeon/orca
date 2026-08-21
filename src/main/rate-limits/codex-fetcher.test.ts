@@ -356,20 +356,20 @@ describe('fetchCodexRateLimits', () => {
     })
   })
 
-  it('does not start the PTY fallback when disabled for background account previews', async () => {
+  it('rejects empty non-unlimited RPC usage without a PTY fallback when disabled', async () => {
     const rpcChild = makeRpcChild()
     childSpawnMock.mockReturnValue(rpcChild)
+    respondToRpcRateLimitRead(rpcChild, { planType: 'plus' })
 
     const resultPromise = fetchCodexRateLimits({ allowPtyFallback: false })
-    await vi.advanceTimersByTimeAsync(0)
-    rpcChild.emit('close')
-    await vi.advanceTimersByTimeAsync(0)
+    await vi.advanceTimersByTimeAsync(2)
 
     await expect(resultPromise).resolves.toMatchObject({
       provider: 'codex',
       session: null,
       weekly: null,
-      status: 'error'
+      status: 'error',
+      error: 'RPC response did not include rate-limit windows'
     })
     expect(rpcChild.stdin.listenerCount('error')).toBe(0)
     expect(ptySpawnMock).not.toHaveBeenCalled()
@@ -413,6 +413,18 @@ describe('fetchCodexRateLimits', () => {
 
     expect(result.session?.windowMinutes).toBe(300)
     expect(result.weekly?.windowMinutes).toBe(10080)
+  })
+
+  it('maps an unlimited Codex account without falling back to the PTY reader', async () => {
+    const rpcChild = makeRpcChild()
+    childSpawnMock.mockReturnValue(rpcChild)
+    respondToRpcRateLimitRead(rpcChild, { credits: { unlimited: true }, planType: 'business' })
+    const resultPromise = fetchCodexRateLimits()
+    await vi.advanceTimersByTimeAsync(2)
+    const result = await resultPromise
+    expect(result.planType).toBe('business')
+    expect(result.isUnlimited).toBe(true)
+    expect(ptySpawnMock).not.toHaveBeenCalled()
   })
 
   it('keeps a weekly-only Codex primary window out of the 5-hour slot', async () => {
