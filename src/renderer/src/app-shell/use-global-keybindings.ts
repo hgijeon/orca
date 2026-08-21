@@ -246,9 +246,7 @@ export function useGlobalKeybindings(args: {
         }
       }
 
-      // Unbound by default like sourceControl.sendReviewNotes below, and deliberately outside
-      // PLUGIN_COMMAND_ALIAS_ACTION_IDS — that list is the closed set plugins may alias, not the
-      // dispatch table. The handler returns false when the tab cannot move, so the chord falls through.
+      // Why: these unbound built-ins are not plugin aliases and must fall through when unavailable.
       for (const { id: actionId } of TAB_MOVE_TO_SPLIT_COMMANDS) {
         if (matchShortcut(actionId) && handlers.get(actionId)?.()) {
           return
