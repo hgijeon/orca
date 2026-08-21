@@ -15,7 +15,7 @@ import { TAB_CONTEXT_SUBMENU_CONTENT_CLASS } from './tab-context-menu-sizing'
 import { useOptionalShortcutLabel } from '@/hooks/useShortcutLabel'
 import { TAB_MOVE_TO_SPLIT_COMMANDS, type KeybindingActionId } from '../../../../shared/keybindings'
 
-// Why: the action is discovered here, so a chord the user assigned has to be visible here too.
+/** Gives each fixed direction its own shortcut-label hook boundary. */
 function PaneColumnDirectionItem({
   actionId,
   direction,
@@ -61,6 +61,7 @@ function paneColumnDirectionLabel(direction: TabSplitDirection): string {
   }
 }
 
+/** Hides the submenu when moving the tab would collapse back to the same layout. */
 export function TabWorkspaceLayoutMenuSection({
   unifiedTabId,
   groupId,

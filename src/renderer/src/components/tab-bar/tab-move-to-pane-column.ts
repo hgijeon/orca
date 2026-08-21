@@ -13,6 +13,7 @@ export type TabPaneColumnMoveTarget = {
   groupId: string
 }
 
+/** Rejects single-tab groups because splitting their only tab is a layout no-op. */
 function resolveTabPaneColumnMoveTargetInWorktree(
   state: TabMovePaneColumnState,
   worktreeId: string,
@@ -32,6 +33,7 @@ function resolveTabPaneColumnMoveTargetInWorktree(
   return { worktreeId, unifiedTabId, groupId }
 }
 
+/** Resolves worktree ownership once so execution and web mirroring share one target. */
 export function resolveTabPaneColumnMoveTarget(
   state: TabMovePaneColumnState,
   unifiedTabId: string,
@@ -45,7 +47,7 @@ export function resolveTabPaneColumnMoveTarget(
     : null
 }
 
-// Why: activeTabId is a terminal entity id; commands must resolve the active unified tab via its group.
+/** Resolves the active unified tab rather than the terminal entity id stored globally. */
 export function resolveActiveTabPaneColumnMoveTarget(
   state: TabMovePaneColumnState
 ): TabPaneColumnMoveTarget | null {
@@ -59,21 +61,31 @@ export function resolveActiveTabPaneColumnMoveTarget(
     : null
 }
 
+/** Mirrors only accepted local moves so paired web state cannot diverge. */
 export function moveTabToNewPaneColumn(args: {
   target: TabPaneColumnMoveTarget
   direction: TabSplitDirection
 }): boolean {
   const state = useAppStore.getState()
-  const moved = state.dropUnifiedTab(args.target.unifiedTabId, {
-    groupId: args.target.groupId,
+  const target = resolveTabPaneColumnMoveTargetInWorktree(
+    state,
+    args.target.worktreeId,
+    args.target.unifiedTabId,
+    args.target.groupId
+  )
+  if (!target) {
+    return false
+  }
+  const moved = state.dropUnifiedTab(target.unifiedTabId, {
+    groupId: target.groupId,
     splitDirection: args.direction
   })
   if (moved) {
     mirrorWebRuntimeTabMove({
       kind: 'split',
-      worktreeId: args.target.worktreeId,
-      tabId: args.target.unifiedTabId,
-      targetGroupId: args.target.groupId,
+      worktreeId: target.worktreeId,
+      tabId: target.unifiedTabId,
+      targetGroupId: target.groupId,
       splitDirection: args.direction
     })
   }

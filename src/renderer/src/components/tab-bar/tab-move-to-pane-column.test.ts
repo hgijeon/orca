@@ -143,4 +143,27 @@ describe('tab-move-to-pane-column', () => {
     expect(moveTabToNewPaneColumn({ target: target!, direction: 'right' })).toBe(false)
     expect(mocks.mirrorWebRuntimeTabMove).not.toHaveBeenCalled()
   })
+
+  it('rejects a target that became stale while its menu was open', () => {
+    const dropUnifiedTab = vi.fn(() => true)
+    const target = resolveTabPaneColumnMoveTarget(useAppStore.getState(), 'tab-b', 'group-1')
+    expect(target).not.toBeNull()
+    useAppStore.setState({
+      groupsByWorktree: {
+        [WT]: [
+          {
+            id: 'group-1',
+            worktreeId: WT,
+            activeTabId: 'tab-a',
+            tabOrder: ['tab-a']
+          }
+        ]
+      },
+      dropUnifiedTab
+    })
+
+    expect(moveTabToNewPaneColumn({ target: target!, direction: 'right' })).toBe(false)
+    expect(dropUnifiedTab).not.toHaveBeenCalled()
+    expect(mocks.mirrorWebRuntimeTabMove).not.toHaveBeenCalled()
+  })
 })
