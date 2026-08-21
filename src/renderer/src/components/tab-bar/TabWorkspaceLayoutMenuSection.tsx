@@ -15,7 +15,7 @@ import { TAB_CONTEXT_SUBMENU_CONTENT_CLASS } from './tab-context-menu-sizing'
 import { useOptionalShortcutLabel } from '@/hooks/useShortcutLabel'
 import { TAB_MOVE_TO_SPLIT_COMMANDS, type KeybindingActionId } from '../../../../shared/keybindings'
 
-// Why: the action is discovered here, so a chord the user assigned has to be visible here too.
+/** Keeps user-assigned chords visible where each move direction is chosen. */
 function PaneColumnDirectionItem({
   actionId,
   direction,
@@ -35,6 +35,7 @@ function PaneColumnDirectionItem({
   )
 }
 
+/** Keeps icon metadata out of the shared command catalog. */
 function paneColumnDirectionIcon(direction: TabSplitDirection): React.JSX.Element {
   switch (direction) {
     case 'right':
@@ -48,6 +49,7 @@ function paneColumnDirectionIcon(direction: TabSplitDirection): React.JSX.Elemen
   }
 }
 
+/** Keeps localized copy separate from stable command ids. */
 function paneColumnDirectionLabel(direction: TabSplitDirection): string {
   switch (direction) {
     case 'right':
@@ -61,6 +63,7 @@ function paneColumnDirectionLabel(direction: TabSplitDirection): string {
   }
 }
 
+/** Hides the submenu when moving the tab would collapse back to the same layout. */
 export function TabWorkspaceLayoutMenuSection({
   unifiedTabId,
   groupId,
