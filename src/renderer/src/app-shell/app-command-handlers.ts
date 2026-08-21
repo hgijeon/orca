@@ -122,7 +122,7 @@ export function createAppCommandHandlers(
     run()
     return true
   }
-  // Why: an unmovable tab (alone in its group) must not swallow the chord — fall through instead.
+  /** Claims a move-to-split chord only after the store accepts the move. */
   const claimMoveTabToSplit = ({
     id,
     direction
@@ -131,7 +131,10 @@ export function createAppCommandHandlers(
       return false
     }
     const target = resolveActiveTabPaneColumnMoveTarget(useAppStore.getState())
-    return target ? claim(id, () => moveTabToNewPaneColumn({ target, direction })) : false
+    if (!target || !moveTabToNewPaneColumn({ target, direction })) {
+      return false
+    }
+    return claim(id, () => {})
   }
   const revealRightSidebarTab = (
     actionId: KeybindingActionId,

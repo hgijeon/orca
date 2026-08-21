@@ -1,10 +1,4 @@
-/**
- * E2E for the "Move Tab to Split" commands.
- *
- * A store-level test calls moveTabToNewPaneColumn directly and passes even when no keypress
- * reaches the handler, so it cannot tell a wired command from an unreachable one. This drives
- * the real path instead: assign a binding, press the chord, assert on the tab group strips.
- */
+/** Drives a real chord because store-only tests cannot prove the shortcut reaches its handler. */
 
 import { test, expect } from './helpers/orca-app'
 import { waitForActiveTerminalManager } from './helpers/terminal'

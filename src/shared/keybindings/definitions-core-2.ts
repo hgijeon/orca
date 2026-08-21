@@ -11,6 +11,7 @@ export const TAB_MOVE_TO_SPLIT_COMMANDS = [
   direction: 'right' | 'left' | 'down' | 'up'
 }[]
 
+/** Leaves all directions unassigned to avoid claiming four new global chords by default. */
 function buildTabMoveToSplitKeybindingDefinitions(): KeybindingDefinition[] {
   return TAB_MOVE_TO_SPLIT_COMMANDS.map(({ id, direction }) => ({
     id,
