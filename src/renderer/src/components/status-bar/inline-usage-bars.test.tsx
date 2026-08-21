@@ -124,6 +124,24 @@ describe('InlineUsageBars', () => {
     expect(markup).toContain('37% used wk')
   })
 
+  it('renders unlimited inactive Codex usage without sign-in copy', async () => {
+    const { InlineUsageBars } = await import('./StatusBar')
+    const limits: ProviderRateLimits = {
+      provider: 'codex',
+      session: null,
+      weekly: null,
+      isUnlimited: true,
+      updatedAt: Date.now(),
+      error: 'temporary failure',
+      status: 'error'
+    }
+
+    const markup = renderToStaticMarkup(<InlineUsageBars limits={limits} isFetching={false} />)
+
+    expect(markup).toContain('Unlimited')
+    expect(markup).not.toContain('Sign in to see usage')
+  })
+
   it('shows remaining copy and remaining meter fill', async () => {
     mocks.usagePercentageDisplay = 'remaining'
     const { InlineUsageBars } = await import('./StatusBar')

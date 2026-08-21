@@ -93,7 +93,12 @@ type RateLimitResetCredits = {
 
 // Why: the Codex app-server wraps rate limit data as { rateLimits: { primary, secondary, ... } }.
 type RpcRateLimitsResponse = {
-  rateLimits?: CodexRateLimitWindowsSnapshot | null
+  rateLimits?:
+    | (CodexRateLimitWindowsSnapshot & {
+        credits?: { unlimited?: boolean } | null
+        planType?: string | null
+      })
+    | null
   rateLimitResetCredits?: {
     availableCount?: number
     totalEarnedCount?: number
@@ -131,6 +136,7 @@ type BackendRateLimitWindow = {
 
 type BackendUsageResponse = {
   plan_type?: string
+  credits?: { unlimited?: boolean } | null
   rate_limit?: {
     primary_window?: BackendRateLimitWindow | null
     secondary_window?: BackendRateLimitWindow | null
@@ -556,6 +562,10 @@ async function fetchViaBackend(
     primary: backendWindowToSnapshot(payload.rate_limit?.primary_window),
     secondary: backendWindowToSnapshot(payload.rate_limit?.secondary_window)
   })
+  const isUnlimited = payload.credits?.unlimited === true
+  if (!classified.session && !classified.weekly && !isUnlimited) {
+    return null
+  }
   return {
     provider: 'codex',
     session: mapRpcWindow(
@@ -568,6 +578,7 @@ async function fetchViaBackend(
     ),
     // Surfaced for the status-bar Usage row (e.g. "Codex · Plus").
     planType: payload.plan_type,
+    ...(isUnlimited ? { isUnlimited: true } : {}),
     ...(payload.rate_limit_reset_credits !== undefined
       ? {
           rateLimitResetCredits:
@@ -807,6 +818,25 @@ async function fetchViaRpc(options?: FetchCodexRateLimitsOptions): Promise<Provi
             const rateLimitResetCredits = mapRpcRateLimitResetCredits(
               wrapper?.rateLimitResetCredits
             )
+            const planType =
+              typeof result?.planType === 'string' && result.planType.trim()
+                ? result.planType
+                : undefined
+            const isUnlimited = result?.credits?.unlimited === true
+            if (!session && !weekly && !isUnlimited) {
+              settle(
+                {
+                  provider: 'codex',
+                  session: null,
+                  weekly: null,
+                  updatedAt: Date.now(),
+                  error: 'RPC response did not include rate-limit windows',
+                  status: 'error'
+                },
+                { kill: true }
+              )
+              return
+            }
 
             settle(
               {
@@ -814,6 +844,8 @@ async function fetchViaRpc(options?: FetchCodexRateLimitsOptions): Promise<Provi
                 session,
                 weekly,
                 ...(rateLimitResetCredits !== undefined ? { rateLimitResetCredits } : {}),
+                ...(planType !== undefined ? { planType } : {}),
+                ...(isUnlimited ? { isUnlimited: true } : {}),
                 updatedAt: Date.now(),
                 error: null,
                 status: 'ok'

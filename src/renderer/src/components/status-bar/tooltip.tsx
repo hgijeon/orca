@@ -280,7 +280,14 @@ export function ProviderPanel({
     )
   }
 
-  if (p.status === 'error' && !p.session && !p.weekly && !p.fableWeekly && !p.monthly) {
+  if (
+    p.status === 'error' &&
+    !p.isUnlimited &&
+    !p.session &&
+    !p.weekly &&
+    !p.fableWeekly &&
+    !p.monthly
+  ) {
     return (
       <div className={`text-xs ${className ?? 'w-full'}`}>
         <div className={`flex items-center gap-1.5 font-medium ${textClass}`}>
@@ -335,22 +342,28 @@ export function ProviderPanel({
 
       <div className={`border-t ${dividerClass}`} />
 
-      {getWindowSections(p).map((s) => (
-        <ProviderRateLimitWindowSection
-          key={s.label}
-          window={s.window}
-          label={s.label}
-          textClass={textClass}
-          mutedClass={mutedClass}
-          emptyBarClass={emptyBarClass}
-          usagePercentageDisplay={usagePercentageDisplay}
-        />
-      ))}
+      {p.isUnlimited ? (
+        <div className={textClass}>
+          {translate('auto.components.status.bar.tooltip.unlimitedUsage', 'Unlimited usage')}
+        </div>
+      ) : (
+        getWindowSections(p).map((s) => (
+          <ProviderRateLimitWindowSection
+            key={s.label}
+            window={s.window}
+            label={s.label}
+            textClass={textClass}
+            mutedClass={mutedClass}
+            emptyBarClass={emptyBarClass}
+            usagePercentageDisplay={usagePercentageDisplay}
+          />
+        ))
+      )}
 
       {p.error ? (
         <ErrorMessage
           message={p.error}
-          stale={!!(p.session || p.weekly || p.fableWeekly || p.monthly)}
+          stale={!!(p.isUnlimited || p.session || p.weekly || p.fableWeekly || p.monthly)}
           inverted={inverted}
         />
       ) : null}

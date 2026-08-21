@@ -2104,6 +2104,7 @@ export class RateLimitService {
     }
 
     const previousHasData = Boolean(
+      previous?.isUnlimited ||
       previous?.session ||
       previous?.weekly ||
       previous?.fableWeekly ||
