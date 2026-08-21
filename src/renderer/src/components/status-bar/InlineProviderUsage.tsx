@@ -71,7 +71,11 @@ export function InlineUsageBars({
           </span>
         </div>
       ))}
-      {usageWindows.length === 0 && limits.status === 'error' ? (
+      {limits.isUnlimited ? (
+        <span className="text-[10px] text-muted-foreground">
+          {translate('auto.components.status.bar.StatusBar.unlimitedUsage', 'Unlimited')}
+        </span>
+      ) : usageWindows.length === 0 && limits.status === 'error' ? (
         <span className="text-[10px] text-muted-foreground">
           {translate('auto.components.status.bar.StatusBar.f19a63e7cd', 'Sign in to see usage')}
         </span>
@@ -81,7 +85,13 @@ export function InlineUsageBars({
 }
 
 export function isUnavailableInactiveUsage(limits: ProviderRateLimits | null | undefined): boolean {
-  return limits?.status === 'error' && !limits.session && !limits.weekly && !limits.fableWeekly
+  return (
+    limits?.status === 'error' &&
+    !limits.isUnlimited &&
+    !limits.session &&
+    !limits.weekly &&
+    !limits.fableWeekly
+  )
 }
 
 export function InlineUsageSignInAction({
