@@ -66,6 +66,11 @@ export async function main(
     await runClaudeTeams(argv.slice(1), cwd)
     return
   }
+  if (argv[0] === 'codex-shell-launch') {
+    const { runCodexShellLaunch } = await import('./codex-shell-launch.js')
+    await runCodexShellLaunch(argv.slice(1))
+    return
+  }
   const parsed = normalizeCommandPositionals(COMMAND_SPECS, parseArgs(argv, COMMAND_PATHS))
   const helpPath = resolveHelpPath(parsed)
   if (helpPath !== null) {

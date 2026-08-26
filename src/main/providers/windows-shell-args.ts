@@ -8,6 +8,7 @@ import {
 } from '../../shared/wsl-login-shell-command'
 import { getBashWrapperLaunchArgs } from './local-pty-shell-ready'
 import { ensureShellReadyWrappersAt } from './local-pty-shell-ready-wrapper-generation'
+import { getFishCodexShellLaunchPreflight } from '../pty/codex-shell-launch-preflight'
 import {
   encodePowerShellCommand,
   getPowerShellOsc133Bootstrap
@@ -20,6 +21,7 @@ const POWERSHELL_ENCODED_COMMAND_ARG_MAX_CHARS = 28_000
 const CMD_UTF8_SETUP_COMMAND = 'chcp 65001 > nul'
 export const ORCA_CODEX_LAUNCH_PREFLIGHT_CMD_QUOTE_ENV = 'ORCA_CODEX_LAUNCH_PREFLIGHT_CMD_QUOTE'
 const CMD_CODEX_LAUNCH_PREFLIGHT = `if defined ORCA_CODEX_LAUNCH_PREFLIGHT call %${ORCA_CODEX_LAUNCH_PREFLIGHT_CMD_QUOTE_ENV}%%ORCA_CODEX_LAUNCH_PREFLIGHT%%${ORCA_CODEX_LAUNCH_PREFLIGHT_CMD_QUOTE_ENV}% agent hooks prepare-codex > nul 2>&1`
+const CMD_CODEX_COMMAND_ROUTER = `if defined ORCA_CODEX_COMMAND_ROUTER (doskey /macros | %SystemRoot%\\System32\\findstr.exe /b /i /l codex= > nul 2>&1 || doskey codex=call %${ORCA_CODEX_LAUNCH_PREFLIGHT_CMD_QUOTE_ENV}%%ORCA_CODEX_COMMAND_ROUTER%%${ORCA_CODEX_LAUNCH_PREFLIGHT_CMD_QUOTE_ENV}% codex-shell-launch $*)`
 // Why: Git for Windows' bash inherits the ConPTY console's OEM code page
 // (CP437), so a TUI that writes UTF-8 bytes straight to the console — agents
 // like Claude Code use WriteFile, not WriteConsoleW — renders as mojibake
@@ -28,8 +30,11 @@ const CMD_CODEX_LAUNCH_PREFLIGHT = `if defined ORCA_CODEX_LAUNCH_PREFLIGHT call 
 // `&&`) keeps startup working even if chcp.com is missing.
 const GIT_BASH_UTF8_LOGIN_COMMAND = 'chcp.com 65001 >/dev/null 2>&1; exec "$BASH" --login -i'
 
-function getGitBashLaunchCommand(codexLaunchPreflightCommand?: string): string {
-  if (!codexLaunchPreflightCommand) {
+function getGitBashLaunchCommand(
+  codexLaunchPreflightCommand?: string,
+  managedCodexHomePath?: string
+): string {
+  if (!codexLaunchPreflightCommand && !managedCodexHomePath) {
     return GIT_BASH_UTF8_LOGIN_COMMAND
   }
 
@@ -142,7 +147,9 @@ function buildWslShellArgs(linuxCwd: string, distro?: string): string[] {
   const setupCommand = [
     `cd ${quotePosixShell(linuxCwd)}`,
     'export PATH="$HOME/.local/bin:$PATH"',
-    buildWslInteractiveLoginShellCommand()
+    buildWslInteractiveLoginShellCommand({
+      fishInitCommand: getFishCodexShellLaunchPreflight()
+    })
   ].join(' && ')
   // Why: WSL users often customize zsh rather than bash; launch the distro's
   // login shell so terminal PATH matches the environment Orca detects.
@@ -178,7 +185,8 @@ export function resolveWindowsShellLaunchArgs(
   defaultCwd: string,
   wslContext?: WindowsShellWslContext,
   startupCommand?: string,
-  codexLaunchPreflightCommand?: string
+  codexLaunchPreflightCommand?: string,
+  managedCodexHomePath?: string
 ): WindowsShellLaunchArgs {
   const shellBasename = pathWin32.basename(shellPath).toLowerCase()
   const nativeCwd = normalizeWindowsTerminalCwd(cwd)
@@ -188,6 +196,7 @@ export function resolveWindowsShellLaunchArgs(
     const startupCommands = [
       CMD_UTF8_SETUP_COMMAND,
       ...(codexLaunchPreflightCommand ? [CMD_CODEX_LAUNCH_PREFLIGHT] : []),
+      ...(managedCodexHomePath ? [CMD_CODEX_COMMAND_ROUTER] : []),
       ...(shellArgStartupCommand ? [shellArgStartupCommand] : [])
     ]
     return {
@@ -214,7 +223,7 @@ export function resolveWindowsShellLaunchArgs(
 
   if (isWindowsGitBashShellPath(shellPath)) {
     return {
-      shellArgs: ['-c', getGitBashLaunchCommand(codexLaunchPreflightCommand)],
+      shellArgs: ['-c', getGitBashLaunchCommand(codexLaunchPreflightCommand, managedCodexHomePath)],
       effectiveCwd: nativeCwd,
       validationCwd: nativeCwd
     }

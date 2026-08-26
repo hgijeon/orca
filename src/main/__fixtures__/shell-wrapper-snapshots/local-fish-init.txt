@@ -2,9 +2,23 @@ function __orca_shell_ready_marker --on-event fish_prompt
   builtin printf "\033]777;orca-shell-ready\007"
   functions -e __orca_shell_ready_marker
 end
-if test -n "$ORCA_CODEX_LAUNCH_PREFLIGHT"; and test (type -t codex 2>/dev/null) = file
+if test -n "$ORCA_CODEX_HOME"
+  if test -n "$CODEX_HOME"; and test "$CODEX_HOME" != "$ORCA_CODEX_HOME"
+    set -gx ORCA_CODEX_INSTALL_HOME "$CODEX_HOME"
+  else if not set -q ORCA_CODEX_INSTALL_HOME
+    set -gx ORCA_CODEX_INSTALL_HOME "$HOME/.codex"
+  end
+  set -gx CODEX_HOME "$ORCA_CODEX_HOME"
+end
+if test (type -t codex 2>/dev/null) = file; and begin; test -n "$ORCA_CODEX_LAUNCH_PREFLIGHT"; or test -n "$ORCA_CODEX_HOME"; end
   function codex
-    command "$ORCA_CODEX_LAUNCH_PREFLIGHT" agent hooks prepare-codex >/dev/null 2>&1; or true
+    if test (count $argv) -gt 0; and test "$argv[1]" = update; and test -n "$ORCA_CODEX_HOME"
+      command env -u ORCA_CODEX_HOME CODEX_HOME="$ORCA_CODEX_INSTALL_HOME" codex $argv
+      return $status
+    end
+    if test -n "$ORCA_CODEX_LAUNCH_PREFLIGHT"
+      command "$ORCA_CODEX_LAUNCH_PREFLIGHT" agent hooks prepare-codex >/dev/null 2>&1; or true
+    end
     command codex $argv
   end
 end

@@ -32,6 +32,18 @@ describe('addOrcaWslInteropEnv', () => {
     expect(env.WSLENV?.split(':')).toContain('ORCA_SHELL_READY_ROOT/p')
   })
 
+  it('publishes the managed Codex overlay features for the guest shell', () => {
+    const env: Record<string, string> = {
+      CODEX_HOME: '/home/ada/.orca/codex-account',
+      ORCA_CODEX_HOME: '/home/ada/.orca/codex-account'
+    }
+
+    addOrcaWslInteropEnv(env)
+
+    expect(env.ORCA_SHELL_FEATURES).toBe('overlay,history,markers')
+    expect(env.WSLENV?.split(':')).toContain('ORCA_SHELL_FEATURES/u')
+  })
+
   it('imports setup-gated startup env into WSL without path translation', () => {
     const env: Record<string, string> = {
       [SETUP_AGENT_SEQUENCE_STARTUP_COMMAND_ENV]: 'codex',

@@ -118,17 +118,15 @@ export function getShellLaunchConfig(
     }
   }
 
-  // Why: mirrors daemon/shell-ready.ts; markerless fish stays unwrapped. The
-  // selection is baked into the init command, so fish needs no feature env var.
-  if (shellName === 'fish' && features.includes('ready')) {
+  // Why: fish applies -C after user config, so this is also its overlay restore point.
+  if (shellName === 'fish' && (features.includes('ready') || features.includes('overlay'))) {
+    const readyInit = features.includes('ready')
+      ? `${getFishShellReadyInitCommand(SHELL_READY_MARKER_ESCAPED)}\n`
+      : ''
     return {
-      args: [
-        '-l',
-        '-C',
-        `${getFishShellReadyInitCommand(SHELL_READY_MARKER_ESCAPED)}\n${getFishCodexShellLaunchPreflight()}`
-      ],
+      args: ['-l', '-C', `${readyInit}${getFishCodexShellLaunchPreflight()}`],
       env: {},
-      supportsReadyMarker: true
+      supportsReadyMarker: features.includes('ready')
     }
   }
 

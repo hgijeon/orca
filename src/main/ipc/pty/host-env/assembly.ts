@@ -13,8 +13,16 @@ import { piTitlebarExtensionService } from '../../../pi/titlebar-extension-servi
 import { ensureLinuxTerminalOrcaCliShimDir } from '../../../cli/linux-terminal-orca-cli-shim'
 import { stripLegacyTerminalShimEnv } from '../../../pty/legacy-terminal-shim-dir'
 import { resolvePathEnvKey, mergePersistedWindowsPath } from '../../../pty/windows-environment-path'
-import { resolveCodexShellLaunchPreflightCommand } from '../../../pty/codex-shell-launch-preflight'
+import {
+  ORCA_CODEX_COMMAND_ROUTER_ENV,
+  resolveCodexShellCommandRouterCommand,
+  resolveCodexShellLaunchPreflightCommand
+} from '../../../pty/codex-shell-launch-preflight'
 import { buildConfiguredProxyEnv } from '../../../../shared/network-proxy'
+import {
+  ORCA_CODEX_INSTALL_HOME_ENV,
+  resolveCodexInstallationHomeForLaunch
+} from '../../../codex/codex-installation-home'
 import type { BuildPtyHostEnvOptions } from './types'
 import { readInheritedPath } from './path'
 import { stripInheritedOrcaCodexHomeOverride } from './codex-home'
@@ -199,11 +207,31 @@ export function buildPtyHostEnv(
   if (opts.skipCodexHomeEnv) {
     delete baseEnv.CODEX_HOME
     delete baseEnv.ORCA_CODEX_HOME
+    delete baseEnv[ORCA_CODEX_INSTALL_HOME_ENV]
+    delete baseEnv[ORCA_CODEX_COMMAND_ROUTER_ENV]
     delete baseEnv.ORCA_CODEX_LAUNCH_PREFLIGHT
   } else if (opts.selectedCodexHomePath) {
+    const installationHome = resolveCodexInstallationHomeForLaunch(baseEnv, opts.isWsl)
     baseEnv.CODEX_HOME = opts.selectedCodexHomePath
     // Why: user startup files may re-export CODEX_HOME; shell-ready wrappers restore this runtime home before Codex launches.
     baseEnv.ORCA_CODEX_HOME = opts.selectedCodexHomePath
+    if (installationHome) {
+      baseEnv[ORCA_CODEX_INSTALL_HOME_ENV] = installationHome
+    } else {
+      delete baseEnv[ORCA_CODEX_INSTALL_HOME_ENV]
+    }
+    const commandRouter = resolveCodexShellCommandRouterCommand({
+      isPackaged: opts.isPackaged,
+      isWsl: opts.isWsl,
+      managedHomePath: opts.selectedCodexHomePath,
+      userDataPath: opts.userDataPath,
+      resourcesPath: opts.resourcesPath
+    })
+    if (commandRouter) {
+      baseEnv[ORCA_CODEX_COMMAND_ROUTER_ENV] = commandRouter
+    } else {
+      delete baseEnv[ORCA_CODEX_COMMAND_ROUTER_ENV]
+    }
     const preflightCommand = resolveCodexShellLaunchPreflightCommand({
       hooksEnabled: opts.codexStatusHooksEnabled ?? opts.agentStatusHooksEnabled,
       isPackaged: opts.isPackaged,
@@ -219,8 +247,12 @@ export function buildPtyHostEnv(
     }
   } else if (opts.stripInheritedOrcaCodexHome) {
     stripInheritedOrcaCodexHomeOverride(baseEnv)
+    delete baseEnv[ORCA_CODEX_INSTALL_HOME_ENV]
+    delete baseEnv[ORCA_CODEX_COMMAND_ROUTER_ENV]
     delete baseEnv.ORCA_CODEX_LAUNCH_PREFLIGHT
   } else {
+    delete baseEnv[ORCA_CODEX_INSTALL_HOME_ENV]
+    delete baseEnv[ORCA_CODEX_COMMAND_ROUTER_ENV]
     delete baseEnv.ORCA_CODEX_LAUNCH_PREFLIGHT
   }
 

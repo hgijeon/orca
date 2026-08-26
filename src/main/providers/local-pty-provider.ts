@@ -807,8 +807,9 @@ export class LocalPtyProvider implements IPtyProvider {
 
       const shellBasename = pathWin32.basename(shellPath).toLowerCase()
       const codexLaunchPreflightCommand = finalEnv.ORCA_CODEX_LAUNCH_PREFLIGHT
+      const managedCodexHomePath = finalEnv.ORCA_CODEX_HOME
       if (
-        codexLaunchPreflightCommand &&
+        (codexLaunchPreflightCommand || managedCodexHomePath) &&
         (shellBasename === 'cmd.exe' || isWindowsGitBashShellPath(shellPath))
       ) {
         if (shellBasename === 'cmd.exe') {
@@ -821,7 +822,8 @@ export class LocalPtyProvider implements IPtyProvider {
           defaultCwd,
           launchWslContext,
           args.command,
-          codexLaunchPreflightCommand
+          codexLaunchPreflightCommand,
+          managedCodexHomePath
         )
         shellArgs = resolved.shellArgs
         effectiveCwd = resolved.effectiveCwd

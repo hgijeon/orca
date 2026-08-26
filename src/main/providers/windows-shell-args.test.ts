@@ -4,6 +4,7 @@ import { join } from 'node:path'
 import { afterEach, beforeEach, describe, expect, it } from 'vitest'
 import { buildWslInteractiveLoginShellCommand } from '../../shared/wsl-login-shell-command'
 import { resolveSetupRunnerCommand } from '../../shared/setup-runner-command'
+import { getFishCodexShellLaunchPreflight } from '../pty/codex-shell-launch-preflight'
 import { resolveWindowsShellLaunchArgs } from './windows-shell-args'
 // Why resolved rather than hardcoded: the wrapper tree is content-addressed.
 import { getShellReadyWrapperRoot } from './local-pty-shell-ready-wrapper-root'
@@ -11,9 +12,10 @@ import { getShellReadyWrapperRoot } from './local-pty-shell-ready-wrapper-root'
 const CODEX_LAUNCH_PREFLIGHT = 'C:\\Program Files\\Orca\\orca.exe'
 const CMD_CODEX_LAUNCH_PREFLIGHT =
   'if defined ORCA_CODEX_LAUNCH_PREFLIGHT call %ORCA_CODEX_LAUNCH_PREFLIGHT_CMD_QUOTE%%ORCA_CODEX_LAUNCH_PREFLIGHT%%ORCA_CODEX_LAUNCH_PREFLIGHT_CMD_QUOTE% agent hooks prepare-codex > nul 2>&1'
+const MANAGED_CODEX_HOME = 'C:\\Orca\\account'
 
 function expectedWslArgs(linuxCwd: string, distro?: string): string[] {
-  const command = `cd '${linuxCwd}' && export PATH="$HOME/.local/bin:$PATH" && ${buildWslInteractiveLoginShellCommand()}`
+  const command = `cd '${linuxCwd}' && export PATH="$HOME/.local/bin:$PATH" && ${buildWslInteractiveLoginShellCommand({ fishInitCommand: getFishCodexShellLaunchPreflight() })}`
   // Why spelled out rather than calling buildWslExecArgs: deriving the
   // expectation from the helper under test would still pass if it regressed
   // to the `--` separator.
@@ -70,6 +72,23 @@ describe('resolveWindowsShellLaunchArgs', () => {
     expect(result.startupCommandDeliveredInShellArgs).toBeUndefined()
     expect(result.effectiveCwd).toBe('C:\\Users\\alice')
     expect(result.validationCwd).toBe('C:\\Users\\alice')
+  })
+
+  it('routes cmd.exe Codex commands without replacing a user macro', () => {
+    const result = resolveWindowsShellLaunchArgs(
+      'cmd.exe',
+      'C:\\Users\\alice',
+      'C:\\Users\\alice',
+      undefined,
+      undefined,
+      undefined,
+      MANAGED_CODEX_HOME
+    )
+
+    expect(result.shellArgs[1]).toContain('doskey /macros')
+    expect(result.shellArgs[1]).toContain('findstr.exe /b /i /l codex=')
+    expect(result.shellArgs[1]).toContain('ORCA_CODEX_COMMAND_ROUTER')
+    expect(result.shellArgs[1]).toContain('codex-shell-launch $*')
   })
 
   it('embeds short cmd.exe startup commands in shell args', () => {
@@ -291,6 +310,23 @@ describe('resolveWindowsShellLaunchArgs', () => {
     const bashRcfile = readFileSync(getGitBashRcfilePath(bashCommand), 'utf8')
     expect(bashRcfile).toContain('"${ORCA_CODEX_LAUNCH_PREFLIGHT}" agent hooks prepare-codex')
     expect(bashRcfile).not.toContain(CODEX_LAUNCH_PREFLIGHT)
+  })
+
+  it('wraps Git Bash for a managed Codex home when hooks are disabled', () => {
+    const result = resolveWindowsShellLaunchArgs(
+      'C:\\Program Files\\Git\\bin\\bash.exe',
+      'C:\\Users\\alice',
+      'C:\\Users\\alice',
+      undefined,
+      undefined,
+      undefined,
+      MANAGED_CODEX_HOME
+    )
+
+    expect(result.shellArgs[1]).toContain('--rcfile')
+    expect(readFileSync(getGitBashRcfilePath(result.shellArgs[1]), 'utf8')).toContain(
+      'ORCA_CODEX_INSTALL_HOME'
+    )
   })
 
   it('keeps Git Bash startup commands on stdin delivery with the preflight wrapper', () => {

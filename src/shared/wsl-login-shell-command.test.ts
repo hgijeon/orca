@@ -306,6 +306,14 @@ describe('wsl login shell command helpers', () => {
     expect(command).toContain('exec "$_orca_wsl_shell" -l')
     expectValidShSyntax(command)
   })
+
+  it('can install a fish post-profile command', () => {
+    const command = buildWslInteractiveLoginShellCommand({ fishInitCommand: 'echo routed' })
+
+    expect(command).toContain('fish)')
+    expect(command).toContain(`exec "$_orca_wsl_shell" -l -C 'echo routed'`)
+    expectValidShSyntax(command)
+  })
 })
 
 describe('in-guest wrapper root resolution', () => {

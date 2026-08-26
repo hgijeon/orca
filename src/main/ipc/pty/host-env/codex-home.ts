@@ -51,7 +51,12 @@ export function shouldStripInheritedOrcaCodexHome(args: {
   )
 }
 
-export const CODEX_HOME_ENV_KEYS = ['CODEX_HOME', 'ORCA_CODEX_HOME'] as const
+export const CODEX_HOME_ENV_KEYS = [
+  'CODEX_HOME',
+  'ORCA_CODEX_HOME',
+  'ORCA_CODEX_INSTALL_HOME',
+  'ORCA_CODEX_COMMAND_ROUTER'
+] as const
 
 // Why: system-default real-home routing runs Codex on the user's own ~/.codex.
 // Nested Orca panes inherit the parent's Orca-owned override; strip only that

@@ -27,7 +27,10 @@
  * hook restores zsh option semantics for the body at call time.
  */
 import { getPosixOmpShellWrapper } from './pty/omp-shell-wrapper'
-import { getPosixCodexShellLaunchPreflight } from './pty/codex-shell-launch-preflight'
+import {
+  getPosixCodexInstallationHomeCapture,
+  getPosixCodexShellLaunchPreflight
+} from './pty/codex-shell-launch-preflight'
 import {
   getZshShellReadyMarkerRegistrationBlock,
   SHELL_STARTUP_IDENTITY_MARKER_BLOCK,
@@ -122,6 +125,7 @@ function getOverlayRestoreBlocks(spec: ZshStartupHookSpec): (string | null)[] {
     MIMOCODE_HOME_RESTORE,
     spec.restores.remoteCliBinDir ? REMOTE_CLI_BIN_DIR_RESTORE : null,
     getPosixOmpShellWrapper(),
+    spec.restores.codexHome ? getPosixCodexInstallationHomeCapture() : null,
     spec.restores.codexHome ? CODEX_HOME_RESTORE : null,
     spec.restores.codexLaunchPreflight ? getPosixCodexShellLaunchPreflight() : null
   ]

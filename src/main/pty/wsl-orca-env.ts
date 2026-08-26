@@ -9,6 +9,7 @@ import {
   SETUP_AGENT_SEQUENCE_STARTUP_SCRIPT_ENV
 } from '../../shared/setup-agent-sequencing'
 import { getShellReadyWrapperRoot } from '../providers/local-pty-shell-ready-wrapper-root'
+import { encodeShellStartupFeatures, selectShellStartupFeatures } from '../shell-startup-features'
 
 const WSLENV_ENTRY_SEPARATOR = ':'
 
@@ -58,6 +59,18 @@ export function addOrcaWslInteropEnv(env: Record<string, string>): void {
   // are always the local file set -- windows-shell-args.ts is shared by the
   // in-process provider and the daemon spawner, so both resolve the same tree.
   env.ORCA_SHELL_READY_ROOT = getShellReadyWrapperRoot()
+  if (env.ORCA_CODEX_HOME) {
+    env.ORCA_SHELL_FEATURES = encodeShellStartupFeatures(
+      selectShellStartupFeatures({
+        // Why zsh: its wrapper needs the history guard; bash and fish ignore that token.
+        shellPath: 'zsh',
+        env,
+        hasStartupCommand: false,
+        waitsForShellReady: false,
+        emitsStartupIdentity: false
+      })
+    )
+  }
   // Why: the endpoint is a Windows path (/p-translated so the guest reads it
   // via /mnt/c) until the WSL hook relay reports the guest home — then it is
   // already a guest-side POSIX path and must cross untranslated.
@@ -76,6 +89,7 @@ export function addOrcaWslInteropEnv(env: Record<string, string>): void {
     // Why /p: the guest reads the content-addressed wrapper tree through /mnt/c,
     // and it cannot derive the hash segment from ORCA_USER_DATA_PATH alone.
     'ORCA_SHELL_READY_ROOT/p',
+    'ORCA_SHELL_FEATURES/u',
     'ORCA_CLI_COMMAND/u',
     'ORCA_PANE_KEY/u',
     'ORCA_TAB_ID/u',

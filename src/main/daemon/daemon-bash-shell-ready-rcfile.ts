@@ -1,5 +1,8 @@
 import { getPosixOmpShellWrapper } from '../pty/omp-shell-wrapper'
-import { getPosixCodexShellLaunchPreflight } from '../pty/codex-shell-launch-preflight'
+import {
+  getPosixCodexInstallationHomeCapture,
+  getPosixCodexShellLaunchPreflight
+} from '../pty/codex-shell-launch-preflight'
 import { BASH_PROMPT_COMMAND_COMPOSITION_BLOCK } from '../bash-prompt-command-composition'
 import { BASH_FEATURE_CHANNEL_BLOCK, SHELL_STARTUP_IDENTITY_MARKER_BLOCK } from '../shell-templates'
 import { SHELL_READY_MARKER } from './daemon-shell-ready-marker'
@@ -40,6 +43,7 @@ __orca_restore_agent_teams_path
 [[ -n "\${ORCA_OPENCODE_CONFIG_DIR:-}" ]] && export OPENCODE_CONFIG_DIR="\${ORCA_OPENCODE_CONFIG_DIR}"
 [[ -n "\${ORCA_MIMOCODE_HOME:-}" ]] && export MIMOCODE_HOME="\${ORCA_MIMOCODE_HOME}"
 ${getPosixOmpShellWrapper()}
+${getPosixCodexInstallationHomeCapture()}
 # Why: Codex must keep using Orca's runtime CODEX_HOME after profile scripts.
 [[ -n "\${ORCA_CODEX_HOME:-}" ]] && export CODEX_HOME="\${ORCA_CODEX_HOME}"
 ${getPosixCodexShellLaunchPreflight()}

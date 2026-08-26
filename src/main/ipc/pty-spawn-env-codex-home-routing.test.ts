@@ -207,6 +207,7 @@ describe('registerPtyHandlers', () => {
       )
       expect(env.CODEX_HOME).toBe(TEST_CODEX_HOME)
       expect(env.ORCA_CODEX_HOME).toBe(TEST_CODEX_HOME)
+      expect(env.ORCA_CODEX_INSTALL_HOME).toBe('/tmp/system-codex-home')
     })
     it('waits for managed Codex auth before spawning a local PTY', async () => {
       vi.useFakeTimers()
@@ -355,6 +356,7 @@ describe('registerPtyHandlers', () => {
       )
       expect(env.CODEX_HOME).toBeUndefined()
       expect(env.ORCA_CODEX_HOME).toBeUndefined()
+      expect(env.ORCA_CODEX_INSTALL_HOME).toBeUndefined()
     })
     it('preserves a user-owned CODEX_HOME for system default when the real-home flag is ON', async () => {
       const env = await spawnAndGetEnv(
@@ -386,6 +388,7 @@ describe('registerPtyHandlers', () => {
       expect(resolvedCodexHome).toBe(customHome)
       expect(env.CODEX_HOME).toBe(TEST_CODEX_HOME)
       expect(env.ORCA_CODEX_HOME).toBe(TEST_CODEX_HOME)
+      expect(env.ORCA_CODEX_INSTALL_HOME).toBe(customHome)
     })
     it('injects explicit proxy settings into local PTY env', async () => {
       const env = await spawnAndGetEnv(undefined, undefined, undefined, () => ({

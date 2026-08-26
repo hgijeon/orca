@@ -7,7 +7,15 @@ const POWERSHELL_OSC133_BOOTSTRAP = `# Orca OSC 133 shell integration for PowerS
 # Restore managed ownership before the shell-integration compatibility guard.
 if ($env:ORCA_OPENCODE_CONFIG_DIR) { $env:OPENCODE_CONFIG_DIR = $env:ORCA_OPENCODE_CONFIG_DIR }
 if ($env:ORCA_MIMOCODE_HOME) { $env:MIMOCODE_HOME = $env:ORCA_MIMOCODE_HOME }
+if ($env:ORCA_CODEX_HOME -and $env:CODEX_HOME -and $env:CODEX_HOME -ne $env:ORCA_CODEX_HOME) {
+    $env:ORCA_CODEX_INSTALL_HOME = $env:CODEX_HOME
+}
+if ($env:ORCA_CODEX_HOME -and -not $env:ORCA_CODEX_INSTALL_HOME) {
+    $env:ORCA_CODEX_INSTALL_HOME = Join-Path $HOME ".codex"
+}
 if ($env:ORCA_CODEX_HOME) { $env:CODEX_HOME = $env:ORCA_CODEX_HOME }
+
+${getPowerShellCodexShellLaunchPreflight()}
 
 if ($ExecutionContext.SessionState.LanguageMode -eq "FullLanguage" -and
     ((-not (Test-Path variable:global:__OrcaOsc133State)) -or
@@ -23,7 +31,6 @@ if ($ExecutionContext.SessionState.LanguageMode -eq "FullLanguage" -and
     } catch { Write-Error $_ -ErrorAction Continue }
 
 ${getPowerShellOmpShellWrapper()}
-${getPowerShellCodexShellLaunchPreflight()}
 
     $Global:__OrcaOsc133State = @{
         OriginalPrompt = $function:prompt

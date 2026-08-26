@@ -104,7 +104,9 @@ export function buildWslCapturedLoginShellCommand(
   }
 }
 
-export function buildWslInteractiveLoginShellCommand(): string {
+export function buildWslInteractiveLoginShellCommand(options?: {
+  fishInitCommand?: string
+}): string {
   return [
     '_orca_wsl_shell=$(getent passwd "$(id -un)" 2>/dev/null | cut -d: -f7)',
     'if [ -z "$_orca_wsl_shell" ] || [ ! -x "$_orca_wsl_shell" ]; then',
@@ -135,6 +137,13 @@ export function buildWslInteractiveLoginShellCommand(): string {
     '      export ZDOTDIR="${_orca_shell_ready_root}/zsh"',
     '    fi',
     '    ;;',
+    ...(options?.fishInitCommand
+      ? [
+          '  fish)',
+          `    exec "$_orca_wsl_shell" -l -C ${quotePosixShell(options.fishInitCommand)}`,
+          '    ;;'
+        ]
+      : []),
     'esac',
     'exec "$_orca_wsl_shell" -l'
   ].join('\n')

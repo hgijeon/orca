@@ -99,7 +99,7 @@ export function createPtyShellLaunchPlan(
     }
     if (
       pathWin32.basename(shellPath).toLowerCase() === 'cmd.exe' &&
-      env.ORCA_CODEX_LAUNCH_PREFLIGHT
+      (env.ORCA_CODEX_LAUNCH_PREFLIGHT || env.ORCA_CODEX_HOME)
     ) {
       env[ORCA_CODEX_LAUNCH_PREFLIGHT_CMD_QUOTE_ENV] = '"'
     }
@@ -124,7 +124,8 @@ export function createPtyShellLaunchPlan(
         resolveSafePtyDefaultCwd(),
         resolvedWslContext,
         opts.command,
-        env.ORCA_CODEX_LAUNCH_PREFLIGHT
+        env.ORCA_CODEX_LAUNCH_PREFLIGHT,
+        env.ORCA_CODEX_HOME
       )
       shellArgs = resolved.shellArgs
       spawnCwd = resolved.effectiveCwd
@@ -152,7 +153,8 @@ export function createPtyShellLaunchPlan(
               resolveSafePtyDefaultCwd(),
               { distro: codexHomeWslInfo.distro },
               opts.command,
-              env.ORCA_CODEX_LAUNCH_PREFLIGHT
+              env.ORCA_CODEX_LAUNCH_PREFLIGHT,
+              env.ORCA_CODEX_HOME
             )
             shellArgs = resolved.shellArgs
             spawnCwd = resolved.effectiveCwd
