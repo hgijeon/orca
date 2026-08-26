@@ -65,11 +65,17 @@ export function getPosixCodexShellLaunchPreflight(): string {
 # Why || : twice — zsh alone aborts inside the substitution, but every shell's
 # assignment adopts its exit status, so an absent codex trips set -e in bash too.
 __orca_codex_binary="$(unalias codex 2>/dev/null || :; command -v codex 2>/dev/null || :)"
-if [[ -n "\${ORCA_CODEX_LAUNCH_PREFLIGHT:-}" && -n "\${__orca_codex_binary:-}" && -x "\${__orca_codex_binary}" ]]; then
+if [[ -n "\${__orca_codex_binary:-}" && -x "\${__orca_codex_binary}" && ( -n "\${ORCA_CODEX_LAUNCH_PREFLIGHT:-}" || ( -n "\${ORCA_CODEX_HOME:-}" && "\${CODEX_HOME:-}" == "\${ORCA_CODEX_HOME}" ) ) ]]; then
   # Why the function reserved word: it suppresses alias expansion of the name,
   # which otherwise rewrites this header at parse time and aborts the whole file.
   function codex {
-    "\${ORCA_CODEX_LAUNCH_PREFLIGHT}" agent hooks prepare-codex >/dev/null 2>&1 || :
+    if [[ "\${1:-}" == "update" && -n "\${ORCA_CODEX_HOME:-}" && "\${CODEX_HOME:-}" == "\${ORCA_CODEX_HOME}" ]]; then
+      command env -u CODEX_HOME -u ORCA_CODEX_HOME codex "$@"
+      return $?
+    fi
+    if [[ -n "\${ORCA_CODEX_LAUNCH_PREFLIGHT:-}" ]]; then
+      "\${ORCA_CODEX_LAUNCH_PREFLIGHT}" agent hooks prepare-codex >/dev/null 2>&1 || :
+    fi
     command codex "$@"
   }
 fi
@@ -78,28 +84,56 @@ unset __orca_codex_binary
 }
 
 export function getFishCodexShellLaunchPreflight(): string {
-  return `if test -n "$ORCA_CODEX_LAUNCH_PREFLIGHT"; and test (type -t codex 2>/dev/null) = file
-  function codex
-    command "$ORCA_CODEX_LAUNCH_PREFLIGHT" agent hooks prepare-codex >/dev/null 2>&1; or true
-    command codex $argv
+  return `if test (type -t codex 2>/dev/null) = file
+  if test -n "$ORCA_CODEX_LAUNCH_PREFLIGHT"; or begin; test -n "$ORCA_CODEX_HOME"; and test "$CODEX_HOME" = "$ORCA_CODEX_HOME"; end
+    function codex
+      if test (count $argv) -gt 0; and test "$argv[1]" = update; and test -n "$ORCA_CODEX_HOME"; and test "$CODEX_HOME" = "$ORCA_CODEX_HOME"
+        command env -u CODEX_HOME -u ORCA_CODEX_HOME codex $argv
+        return $status
+      end
+      if test -n "$ORCA_CODEX_LAUNCH_PREFLIGHT"
+        command "$ORCA_CODEX_LAUNCH_PREFLIGHT" agent hooks prepare-codex >/dev/null 2>&1; or true
+      end
+      command codex $argv
+    end
   end
 end`
 }
 
 export function getPowerShellCodexShellLaunchPreflight(): string {
   return `$orcaCodexCommand = Get-Command codex -ErrorAction SilentlyContinue | Select-Object -First 1
-if ($env:ORCA_CODEX_LAUNCH_PREFLIGHT -and $orcaCodexCommand -and
+if ($orcaCodexCommand -and
+    ($env:ORCA_CODEX_LAUNCH_PREFLIGHT -or
+     ($env:ORCA_CODEX_HOME -and $env:CODEX_HOME -eq $env:ORCA_CODEX_HOME)) -and
     $orcaCodexCommand.CommandType -in @("Application", "ExternalScript")) {
     function Global:codex {
-        try {
-            & $env:ORCA_CODEX_LAUNCH_PREFLIGHT agent hooks prepare-codex *> $null
-        } catch {
-        }
         $orcaCodexExecutable = Get-Command codex -CommandType Application,ExternalScript -ErrorAction SilentlyContinue | Select-Object -First 1
         if (-not $orcaCodexExecutable) {
             Write-Error "codex executable not found"
             $global:LASTEXITCODE = 127
             return
+        }
+        if ($args.Count -gt 0 -and $args[0] -eq "update" -and
+            $env:ORCA_CODEX_HOME -and $env:CODEX_HOME -eq $env:ORCA_CODEX_HOME) {
+            $orcaManagedCodexHome = $env:ORCA_CODEX_HOME
+            $orcaRoutedCodexHome = $env:CODEX_HOME
+            Remove-Item Env:CODEX_HOME -ErrorAction SilentlyContinue
+            Remove-Item Env:ORCA_CODEX_HOME -ErrorAction SilentlyContinue
+            try {
+                & $orcaCodexExecutable.Source @args
+                $orcaCodexExitCode = $LASTEXITCODE
+            } finally {
+                $env:CODEX_HOME = $orcaRoutedCodexHome
+                $env:ORCA_CODEX_HOME = $orcaManagedCodexHome
+            }
+            $global:LASTEXITCODE = $orcaCodexExitCode
+            return
+        }
+        if ($env:ORCA_CODEX_LAUNCH_PREFLIGHT) {
+            try {
+                & $env:ORCA_CODEX_LAUNCH_PREFLIGHT agent hooks prepare-codex *> $null
+            } catch {
+            }
         }
         & $orcaCodexExecutable.Source @args
         $global:LASTEXITCODE = $LASTEXITCODE

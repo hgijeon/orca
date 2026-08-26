@@ -79,6 +79,37 @@ function runAliasLaunch(
   ).trim()
 }
 
+function runManagedHomeCommands(root: string, wrapper: string, shell = '/bin/bash'): string[] {
+  const home = join(root, 'managed-home')
+  const bin = join(root, 'bin')
+  mkdirSync(home)
+  mkdirSync(bin)
+  writeExecutable(
+    join(bin, 'codex'),
+    '#!/bin/sh\nprintf "%s|%s|%s\\n" "${CODEX_HOME-unset}" "${ORCA_CODEX_HOME-unset}" "$*"\n'
+  )
+  const isZsh = shell.endsWith('/zsh')
+  return execFileSync(
+    shell,
+    [
+      ...(isZsh ? ['-f'] : ['--noprofile', '--norc']),
+      '-c',
+      [wrapper, 'codex update', 'codex doctor'].join('\n')
+    ],
+    {
+      encoding: 'utf-8',
+      env: {
+        ...process.env,
+        PATH: `${bin}:${process.env.PATH ?? ''}`,
+        CODEX_HOME: home,
+        ORCA_CODEX_HOME: home
+      }
+    }
+  )
+    .trim()
+    .split('\n')
+}
+
 /** Launches a startup file that aliases the very name Orca wraps, then asserts the
  *  wrapper installed, the preflight ran, and the user's alias still applies. */
 function expectNamedAliasSurvives(shell: string, enableAliases: string): void {
@@ -161,6 +192,48 @@ describe.skipIf(process.platform === 'win32')('Codex shell launch preflight', ()
     expectNamedAliasSurvives('/bin/bash', 'shopt -s expand_aliases')
   })
 
+  for (const shell of ['/bin/bash', '/bin/zsh']) {
+    it.skipIf(!existsSync(shell))(
+      `routes ${shell} updates through the system install context only`,
+      () => {
+        const root = mkdtempSync(join(tmpdir(), 'orca-codex-update-routing-'))
+        roots.push(root)
+
+        expect(runManagedHomeCommands(root, getPosixCodexShellLaunchPreflight(), shell)).toEqual([
+          'unset|unset|update',
+          `${join(root, 'managed-home')}|${join(root, 'managed-home')}|doctor`
+        ])
+      }
+    )
+  }
+
+  it('preserves a user-owned CODEX_HOME for updates', () => {
+    const root = mkdtempSync(join(tmpdir(), 'orca-codex-custom-home-update-'))
+    const bin = join(root, 'bin')
+    roots.push(root)
+    mkdirSync(bin)
+    writeExecutable(
+      join(bin, 'codex'),
+      '#!/bin/sh\nprintf "%s|%s\\n" "$CODEX_HOME" "$ORCA_CODEX_HOME"\n'
+    )
+
+    const output = execFileSync(
+      '/bin/bash',
+      ['--noprofile', '--norc', '-c', `${getPosixCodexShellLaunchPreflight()}\ncodex update`],
+      {
+        encoding: 'utf-8',
+        env: {
+          ...process.env,
+          PATH: `${bin}:${process.env.PATH ?? ''}`,
+          CODEX_HOME: join(root, 'user-home'),
+          ORCA_CODEX_HOME: join(root, 'managed-home')
+        }
+      }
+    )
+
+    expect(output.trim()).toBe(`${join(root, 'user-home')}|${join(root, 'managed-home')}`)
+  })
+
   it('still launches Codex when the best-effort preflight fails', () => {
     const root = mkdtempSync(join(tmpdir(), 'orca-codex-preflight-failure-'))
     roots.push(root)
@@ -218,6 +291,16 @@ describe.skipIf(process.platform === 'win32')('Codex shell launch preflight', ()
 
     expect(output.trim()).toBe('custom-codex')
   })
+
+  it.skipIf(!fishAvailable)('routes fish updates through the system install context only', () => {
+    const root = mkdtempSync(join(tmpdir(), 'orca-codex-update-routing-fish-'))
+    roots.push(root)
+
+    expect(runManagedHomeCommands(root, getFishCodexShellLaunchPreflight(), 'fish')).toEqual([
+      'unset|unset|update',
+      `${join(root, 'managed-home')}|${join(root, 'managed-home')}|doctor`
+    ])
+  })
 })
 
 describe('PowerShell Codex shell launch preflight', () => {
@@ -268,6 +351,47 @@ describe('PowerShell Codex shell launch preflight', () => {
     expect(result.status, result.stderr).toBe(0)
     expect(result.stdout.trim()).toBe('launched')
   })
+
+  it.skipIf(!pwshAvailable)(
+    'routes PowerShell updates through the system install context only',
+    () => {
+      const root = mkdtempSync(join(tmpdir(), 'orca-codex-update-routing-pwsh-'))
+      const home = join(root, 'managed-home')
+      const bin = join(root, 'bin')
+      roots.push(root)
+      mkdirSync(home)
+      mkdirSync(bin)
+      writeExecutable(
+        join(bin, 'codex'),
+        '#!/bin/sh\nprintf "%s|%s|%s\\n" "${CODEX_HOME-unset}" "${ORCA_CODEX_HOME-unset}" "$*"\n'
+      )
+
+      const result = spawnSync(
+        'pwsh',
+        [
+          '-NoLogo',
+          '-NoProfile',
+          '-Command',
+          `${getPowerShellCodexShellLaunchPreflight()}\ncodex update\ncodex doctor`
+        ],
+        {
+          encoding: 'utf-8',
+          env: {
+            ...process.env,
+            PATH: `${bin}${delimiter}${process.env.PATH ?? ''}`,
+            CODEX_HOME: home,
+            ORCA_CODEX_HOME: home
+          }
+        }
+      )
+
+      expect(result.status, result.stderr).toBe(0)
+      expect(result.stdout.trim().split('\n')).toEqual([
+        'unset|unset|update',
+        `${home}|${home}|doctor`
+      ])
+    }
+  )
 })
 
 describe('Codex shell launch preflight command', () => {

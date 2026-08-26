@@ -308,6 +308,21 @@ describe('resolveWindowsShellLaunchArgs', () => {
     expect(result.startupCommandDeliveredInShellArgs).toBeUndefined()
   })
 
+  it('loads Codex update routing in Git Bash when hook preflight is disabled', () => {
+    const result = resolveWindowsShellLaunchArgs(
+      'C:\\Program Files\\Git\\bin\\bash.exe',
+      'C:\\Users\\alice',
+      'C:\\Users\\alice',
+      undefined,
+      undefined,
+      undefined,
+      true
+    )
+
+    const rcfilePath = getGitBashRcfilePath(result.shellArgs[1])
+    expect(readFileSync(rcfilePath, 'utf8')).toContain('env -u CODEX_HOME -u ORCA_CODEX_HOME codex')
+  })
+
   it('quotes a spaced preflight path through each shell environment', () => {
     const cmd = resolveWindowsShellLaunchArgs(
       'cmd.exe',

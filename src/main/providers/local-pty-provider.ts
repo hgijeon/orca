@@ -798,9 +798,12 @@ export class LocalPtyProvider implements IPtyProvider {
 
       const shellBasename = pathWin32.basename(shellPath).toLowerCase()
       const codexLaunchPreflightCommand = finalEnv.ORCA_CODEX_LAUNCH_PREFLIGHT
+      const needsGitBashCodexWrapper =
+        isWindowsGitBashShellPath(shellPath) &&
+        Boolean(codexLaunchPreflightCommand || finalEnv.ORCA_CODEX_HOME)
       if (
-        codexLaunchPreflightCommand &&
-        (shellBasename === 'cmd.exe' || isWindowsGitBashShellPath(shellPath))
+        (codexLaunchPreflightCommand && shellBasename === 'cmd.exe') ||
+        needsGitBashCodexWrapper
       ) {
         if (shellBasename === 'cmd.exe') {
           // Why: node-pty backslash-escapes argv quotes; expand the quote inside cmd.exe instead.
@@ -812,7 +815,8 @@ export class LocalPtyProvider implements IPtyProvider {
           defaultCwd,
           launchWslContext,
           args.command,
-          codexLaunchPreflightCommand
+          codexLaunchPreflightCommand,
+          Boolean(finalEnv.ORCA_CODEX_HOME)
         )
         shellArgs = resolved.shellArgs
         effectiveCwd = resolved.effectiveCwd
