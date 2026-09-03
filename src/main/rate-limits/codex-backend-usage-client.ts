@@ -121,17 +121,19 @@ export async function supplementCodexSessionWindow(
       return limits
     }
     const rateLimitResetCredits = backend.rateLimitResetCredits ?? limits.rateLimitResetCredits
+    const backendMetadata = {
+      planType: backend.planType ?? limits.planType,
+      ...(backend.isUnlimited ? { isUnlimited: true } : {}),
+      ...(rateLimitResetCredits !== undefined ? { rateLimitResetCredits } : {})
+    }
     if (!backend.session) {
-      return rateLimitResetCredits === limits.rateLimitResetCredits
-        ? limits
-        : { ...limits, rateLimitResetCredits }
+      return { ...limits, ...backendMetadata }
     }
     return {
       ...limits,
       session: backend.session,
       weekly: backend.weekly ?? limits.weekly,
-      planType: backend.planType ?? limits.planType,
-      ...(rateLimitResetCredits !== undefined ? { rateLimitResetCredits } : {}),
+      ...backendMetadata,
       updatedAt: backend.updatedAt
     }
   } catch {
