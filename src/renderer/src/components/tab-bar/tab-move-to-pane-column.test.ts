@@ -143,4 +143,38 @@ describe('tab-move-to-pane-column', () => {
     expect(moveTabToNewPaneColumn({ target: target!, direction: 'right' })).toBe(false)
     expect(mocks.mirrorWebRuntimeTabMove).not.toHaveBeenCalled()
   })
+
+  it('rejects a target after its tab changes groups', () => {
+    const dropUnifiedTab = vi.fn(() => true)
+    useAppStore.setState({ dropUnifiedTab } as Partial<ReturnType<typeof useAppStore.getState>>)
+    const target = resolveTabPaneColumnMoveTarget(useAppStore.getState(), 'tab-b', 'group-1')
+    expect(target).not.toBeNull()
+
+    const tabs = useAppStore.getState().unifiedTabsByWorktree[WT] ?? []
+    useAppStore.setState({
+      groupsByWorktree: {
+        [WT]: [
+          {
+            id: 'group-1',
+            worktreeId: WT,
+            activeTabId: 'tab-a',
+            tabOrder: ['tab-a']
+          },
+          {
+            id: 'group-2',
+            worktreeId: WT,
+            activeTabId: 'tab-b',
+            tabOrder: ['tab-b']
+          }
+        ]
+      },
+      unifiedTabsByWorktree: {
+        [WT]: tabs.map((tab) => (tab.id === 'tab-b' ? { ...tab, groupId: 'group-2' } : tab))
+      }
+    })
+
+    expect(moveTabToNewPaneColumn({ target: target!, direction: 'right' })).toBe(false)
+    expect(dropUnifiedTab).not.toHaveBeenCalled()
+    expect(mocks.mirrorWebRuntimeTabMove).not.toHaveBeenCalled()
+  })
 })
