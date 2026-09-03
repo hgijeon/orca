@@ -234,7 +234,7 @@ export function ProviderSegment({
   return (
     <span className="inline-flex items-center gap-1.5">
       <ProviderIcon provider={provider} />
-      {p.isUnlimited && !compact ? (
+      {p.isUnlimited ? (
         <span className="text-[11px] font-medium">
           {translate('auto.components.status.bar.StatusBar.unlimitedUsage', 'Unlimited')}
         </span>
