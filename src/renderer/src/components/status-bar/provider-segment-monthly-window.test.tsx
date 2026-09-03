@@ -84,7 +84,7 @@ describe('ProviderSegment monthly window', () => {
     }
 
     const markup = renderToStaticMarkup(
-      <ProviderSegment p={limits} compact={false} display="used" mode="compact" />
+      <ProviderSegment p={limits} compact={true} display="used" mode="compact" />
     )
 
     expect(markup).toContain('Unlimited')
