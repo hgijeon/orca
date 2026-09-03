@@ -67,16 +67,24 @@ export function moveTabToNewPaneColumn(args: {
   direction: TabSplitDirection
 }): boolean {
   const state = useAppStore.getState()
-  const moved = state.dropUnifiedTab(args.target.unifiedTabId, {
-    groupId: args.target.groupId,
+  const target = resolveTabPaneColumnMoveTarget(
+    state,
+    args.target.unifiedTabId,
+    args.target.groupId
+  )
+  if (!target || target.worktreeId !== args.target.worktreeId) {
+    return false
+  }
+  const moved = state.dropUnifiedTab(target.unifiedTabId, {
+    groupId: target.groupId,
     splitDirection: args.direction
   })
   if (moved) {
     mirrorWebRuntimeTabMove({
       kind: 'split',
-      worktreeId: args.target.worktreeId,
-      tabId: args.target.unifiedTabId,
-      targetGroupId: args.target.groupId,
+      worktreeId: target.worktreeId,
+      tabId: target.unifiedTabId,
+      targetGroupId: target.groupId,
       splitDirection: args.direction
     })
   }
