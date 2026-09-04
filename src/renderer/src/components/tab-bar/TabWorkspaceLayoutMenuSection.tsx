@@ -8,12 +8,15 @@ import {
 } from '@/components/ui/dropdown-menu'
 import { ArrowDown, ArrowLeft, ArrowRight, ArrowUp, Columns2 } from 'lucide-react'
 import type { TabSplitDirection } from '../../store/slices/tabs'
-import { translate } from '@/i18n/i18n'
 import { useAppStore } from '../../store'
 import { moveTabToNewPaneColumn, resolveTabPaneColumnMoveTarget } from './tab-move-to-pane-column'
 import { TAB_CONTEXT_SUBMENU_CONTENT_CLASS } from './tab-context-menu-sizing'
 import { useOptionalShortcutLabel } from '@/hooks/useShortcutLabel'
 import { TAB_MOVE_TO_SPLIT_COMMANDS, type KeybindingActionId } from '../../../../shared/keybindings'
+import {
+  translateTabMoveToSplitDirection,
+  translateTabMoveToSplitLabel
+} from '@/lib/tab-move-to-split-copy'
 
 /** Keeps user-assigned chords visible where each move direction is chosen. */
 function PaneColumnDirectionItem({
@@ -29,7 +32,7 @@ function PaneColumnDirectionItem({
   return (
     <DropdownMenuItem onSelect={onSelect}>
       {paneColumnDirectionIcon(direction)}
-      {paneColumnDirectionLabel(direction)}
+      {translateTabMoveToSplitDirection(direction)}
       {shortcut ? <DropdownMenuShortcut>{shortcut}</DropdownMenuShortcut> : null}
     </DropdownMenuItem>
   )
@@ -46,20 +49,6 @@ function paneColumnDirectionIcon(direction: TabSplitDirection): React.JSX.Elemen
       return <ArrowDown className="size-3.5 shrink-0" />
     case 'up':
       return <ArrowUp className="size-3.5 shrink-0" />
-  }
-}
-
-/** Keeps localized copy separate from stable command ids. */
-function paneColumnDirectionLabel(direction: TabSplitDirection): string {
-  switch (direction) {
-    case 'right':
-      return translate('auto.components.tab.bar.TabWorkspaceLayoutMenuSection.right', 'Right')
-    case 'left':
-      return translate('auto.components.tab.bar.TabWorkspaceLayoutMenuSection.left', 'Left')
-    case 'down':
-      return translate('auto.components.tab.bar.TabWorkspaceLayoutMenuSection.down', 'Down')
-    case 'up':
-      return translate('auto.components.tab.bar.TabWorkspaceLayoutMenuSection.up', 'Up')
   }
 }
 
@@ -83,10 +72,7 @@ export function TabWorkspaceLayoutMenuSection({
       <DropdownMenuSub>
         <DropdownMenuSubTrigger className="[&>svg:last-child]:size-3.5">
           <Columns2 className="size-3.5 shrink-0" />
-          {translate(
-            'auto.components.tab.bar.TabWorkspaceLayoutMenuSection.moveToPaneColumn',
-            'Move Tab to Split'
-          )}
+          {translateTabMoveToSplitLabel()}
         </DropdownMenuSubTrigger>
         <DropdownMenuSubContent className={TAB_CONTEXT_SUBMENU_CONTENT_CLASS}>
           {TAB_MOVE_TO_SPLIT_COMMANDS.map(({ id, direction }) => (
