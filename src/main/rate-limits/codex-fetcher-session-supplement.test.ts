@@ -148,6 +148,7 @@ describe('Codex backend session supplement credits', () => {
     vi.mocked(fetch).mockResolvedValue(usageResponse({ available_count: 0 }, true))
 
     await expect(fetchWeeklyOnly()).resolves.toMatchObject({
+      status: 'ok',
       session: null,
       weekly: { usedPercent: 22, windowMinutes: 10_080 },
       planType: 'business',

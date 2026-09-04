@@ -109,6 +109,11 @@ function respondToRpcRateLimitRead(
   })
 }
 
+async function advanceRpcResponseTimers(): Promise<void> {
+  await vi.advanceTimersByTimeAsync(1)
+  await vi.advanceTimersByTimeAsync(1)
+}
+
 function makePtyTerm() {
   let dataHandler: ((data: string) => void) | null = null
   let exitHandler: (() => void) | null = null
@@ -407,8 +412,7 @@ describe('fetchCodexRateLimits', () => {
     })
 
     const resultPromise = fetchCodexRateLimits()
-    await vi.advanceTimersByTimeAsync(1)
-    await vi.advanceTimersByTimeAsync(1)
+    await advanceRpcResponseTimers()
     const result = await resultPromise
 
     expect(result.session?.windowMinutes).toBe(300)
@@ -422,8 +426,7 @@ describe('fetchCodexRateLimits', () => {
     const resultPromise = fetchCodexRateLimits()
     await vi.advanceTimersByTimeAsync(2)
     const result = await resultPromise
-    expect(result.planType).toBe('business')
-    expect(result.isUnlimited).toBe(true)
+    expect(result).toMatchObject({ status: 'ok', planType: 'business', isUnlimited: true })
     expect(ptySpawnMock).not.toHaveBeenCalled()
   })
 
@@ -436,8 +439,7 @@ describe('fetchCodexRateLimits', () => {
     })
 
     const resultPromise = fetchCodexRateLimits()
-    await vi.advanceTimersByTimeAsync(1)
-    await vi.advanceTimersByTimeAsync(1)
+    await advanceRpcResponseTimers()
 
     await expect(resultPromise).resolves.toMatchObject({
       session: null,
@@ -481,8 +483,7 @@ describe('fetchCodexRateLimits', () => {
     } as Response)
 
     const resultPromise = fetchCodexRateLimits()
-    await vi.advanceTimersByTimeAsync(1)
-    await vi.advanceTimersByTimeAsync(1)
+    await advanceRpcResponseTimers()
 
     await expect(resultPromise).resolves.toMatchObject({
       session: { usedPercent: 7, windowMinutes: 300, resetsAt: 1_800_000_000_000 },
@@ -501,8 +502,7 @@ describe('fetchCodexRateLimits', () => {
     })
 
     const resultPromise = fetchCodexRateLimits()
-    await vi.advanceTimersByTimeAsync(1)
-    await vi.advanceTimersByTimeAsync(1)
+    await advanceRpcResponseTimers()
 
     await expect(resultPromise).resolves.toMatchObject({
       session: { usedPercent: 11, windowMinutes: 300 },
@@ -577,8 +577,7 @@ describe('fetchCodexRateLimits', () => {
     })
 
     const resultPromise = fetchCodexRateLimits({ codexHomePath: '/managed/codex-home' })
-    await vi.advanceTimersByTimeAsync(1)
-    await vi.advanceTimersByTimeAsync(1)
+    await advanceRpcResponseTimers()
     const result = await resultPromise
 
     expect(result.rateLimitResetCredits).toEqual({
@@ -660,8 +659,7 @@ describe('fetchCodexRateLimits', () => {
     })
 
     const resultPromise = fetchCodexRateLimits()
-    await vi.advanceTimersByTimeAsync(1)
-    await vi.advanceTimersByTimeAsync(1)
+    await advanceRpcResponseTimers()
     const result = await resultPromise
 
     expect(result.rateLimitResetCredits).toEqual({
@@ -717,8 +715,7 @@ describe('fetchCodexRateLimits', () => {
       const resultPromise = fetchCodexRateLimits({
         codexHomePath: '\\\\wsl.localhost\\Ubuntu\\home\\alice\\.local\\share\\orca\\account\\home'
       })
-      await vi.advanceTimersByTimeAsync(1)
-      await vi.advanceTimersByTimeAsync(1)
+      await advanceRpcResponseTimers()
       await resultPromise
 
       const [spawnFile, spawnArgs, spawnOptions] = childSpawnMock.mock.calls[0]
@@ -794,8 +791,7 @@ describe('fetchCodexRateLimits', () => {
 
     try {
       const resultPromise = fetchCodexRateLimits({ codexHomePath: 'C:\\Users\\alice\\.codex' })
-      await vi.advanceTimersByTimeAsync(1)
-      await vi.advanceTimersByTimeAsync(1)
+      await advanceRpcResponseTimers()
       await resultPromise
 
       const [spawnFile, spawnArgs, spawnOptions] = childSpawnMock.mock.calls[0]
