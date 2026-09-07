@@ -4,7 +4,7 @@ import { mirrorWebRuntimeTabMove } from './web-runtime-tab-move-mirror'
 
 type TabMovePaneColumnState = Pick<
   ReturnType<typeof useAppStore.getState>,
-  'activeWorktreeId' | 'getActiveTab' | 'unifiedTabsByWorktree' | 'groupsByWorktree'
+  'unifiedTabsByWorktree' | 'groupsByWorktree'
 >
 
 export type TabPaneColumnMoveTarget = {
@@ -49,7 +49,8 @@ export function resolveTabPaneColumnMoveTarget(
 
 /** Resolves the active unified tab rather than the terminal entity id stored globally. */
 export function resolveActiveTabPaneColumnMoveTarget(
-  state: TabMovePaneColumnState
+  state: TabMovePaneColumnState &
+    Pick<ReturnType<typeof useAppStore.getState>, 'activeWorktreeId' | 'getActiveTab'>
 ): TabPaneColumnMoveTarget | null {
   const worktreeId = state.activeWorktreeId
   if (!worktreeId) {
