@@ -253,9 +253,7 @@ export function readCodexRateLimitsViaRpc(
           const weekly = mapCodexRateLimitWindow(classified.weekly, CODEX_WEEKLY_WINDOW_MINUTES)
           const credits = mapRpcRateLimitResetCredits(wrapper?.rateLimitResetCredits)
           const planType =
-            typeof rateLimits?.planType === 'string' && rateLimits.planType.trim()
-              ? rateLimits.planType
-              : undefined
+            typeof rateLimits?.planType === 'string' ? rateLimits.planType.trim() : undefined
           const isUnlimited = rateLimits?.credits?.unlimited === true
           if (!session && !weekly && !isUnlimited) {
             settle(
@@ -277,7 +275,7 @@ export function readCodexRateLimitsViaRpc(
               session,
               weekly,
               ...(credits !== undefined ? { rateLimitResetCredits: credits } : {}),
-              ...(planType !== undefined ? { planType } : {}),
+              ...(planType ? { planType } : {}),
               ...(isUnlimited ? { isUnlimited: true } : {}),
               updatedAt: Date.now(),
               error: null,

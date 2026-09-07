@@ -422,7 +422,7 @@ describe('fetchCodexRateLimits', () => {
   it('maps an unlimited Codex account without falling back to the PTY reader', async () => {
     const rpcChild = makeRpcChild()
     childSpawnMock.mockReturnValue(rpcChild)
-    respondToRpcRateLimitRead(rpcChild, { credits: { unlimited: true }, planType: 'business' })
+    respondToRpcRateLimitRead(rpcChild, { credits: { unlimited: true }, planType: ' business ' })
     const resultPromise = fetchCodexRateLimits()
     await vi.advanceTimersByTimeAsync(2)
     const result = await resultPromise

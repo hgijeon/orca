@@ -91,6 +91,19 @@ describe('getUsageRosterRowState', () => {
     ).toEqual({ kind: 'unlimited', statusLabel: 'Unlimited' })
   })
 
+  it('prioritizes unlimited metadata over retained usage windows', () => {
+    expect(
+      getUsageRosterRowState(
+        provider({
+          provider: 'codex',
+          isUnlimited: true,
+          session: { usedPercent: 90, windowMinutes: 300, resetsAt: null, resetDescription: null }
+        }),
+        true
+      )
+    ).toEqual({ kind: 'unlimited', statusLabel: 'Unlimited' })
+  })
+
   it('distinguishes unavailable and empty successful responses', () => {
     expect(
       getUsageRosterRowState(

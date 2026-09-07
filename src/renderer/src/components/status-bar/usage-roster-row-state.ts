@@ -34,9 +34,6 @@ export function getUsageRosterRowState(
   provider: ProviderRateLimits,
   hasUsage: boolean
 ): UsageRosterRowState {
-  if (hasUsage) {
-    return { kind: 'usage', statusLabel: null }
-  }
   if (provider.isUnlimited) {
     return {
       kind: 'unlimited',
@@ -45,6 +42,9 @@ export function getUsageRosterRowState(
         'Unlimited'
       )
     }
+  }
+  if (hasUsage) {
+    return { kind: 'usage', statusLabel: null }
   }
   if (provider.status === 'idle' || provider.status === 'fetching') {
     return {
