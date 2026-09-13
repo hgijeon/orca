@@ -74,22 +74,19 @@ function makeRpcChild(rateLimitResetCredits?: unknown) {
 }
 
 function usageResponse(rateLimitResetCredits?: unknown, unlimited = false): Response {
-  return {
-    ok: true,
-    json: async () => ({
-      plan_type: unlimited ? 'business' : 'pro',
-      ...(unlimited ? { credits: { unlimited: true } } : {}),
-      rate_limit: {
-        primary_window: {
-          used_percent: 23,
-          limit_window_seconds: 7 * 24 * 60 * 60
-        }
-      },
-      ...(rateLimitResetCredits !== undefined
-        ? { rate_limit_reset_credits: rateLimitResetCredits }
-        : {})
-    })
-  } as Response
+  return Response.json({
+    plan_type: unlimited ? 'business' : 'pro',
+    ...(unlimited ? { credits: { unlimited: true } } : {}),
+    rate_limit: {
+      primary_window: {
+        used_percent: 23,
+        limit_window_seconds: 7 * 24 * 60 * 60
+      }
+    },
+    ...(rateLimitResetCredits !== undefined
+      ? { rate_limit_reset_credits: rateLimitResetCredits }
+      : {})
+  })
 }
 
 function dedicatedCreditsResponse(): Response {

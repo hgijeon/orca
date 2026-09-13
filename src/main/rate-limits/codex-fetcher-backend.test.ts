@@ -102,18 +102,14 @@ describe('Codex backend rate-limit requests', () => {
       JSON.stringify({ tokens: { access_token: 'access-token', account_id: 'account-id' } })
     )
     vi.mocked(fetch)
-      .mockResolvedValueOnce({
-        ok: true,
-        json: async () => ({
+      .mockResolvedValueOnce(
+        Response.json({
           plan_type: 'business',
           rate_limit: null,
           credits: { unlimited: true }
         })
-      } as Response)
-      .mockResolvedValueOnce({
-        ok: true,
-        json: async () => ({ available_count: 0, credits: [] })
-      } as Response)
+      )
+      .mockResolvedValueOnce(Response.json({ available_count: 0, credits: [] }))
 
     await expect(
       fetchCodexRateLimits({
@@ -128,10 +124,7 @@ describe('Codex backend rate-limit requests', () => {
     readFileMock.mockResolvedValue(
       JSON.stringify({ tokens: { access_token: 'access-token', account_id: 'account-id' } })
     )
-    vi.mocked(fetch).mockResolvedValue({
-      ok: true,
-      json: async () => ({ plan_type: 'plus', rate_limit: null })
-    } as Response)
+    vi.mocked(fetch).mockResolvedValue(Response.json({ plan_type: 'plus', rate_limit: null }))
     childSpawnMock.mockImplementation(() => {
       throw new Error('spawn failed')
     })
