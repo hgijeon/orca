@@ -73,7 +73,7 @@ describe('createAppCommandHandlers', () => {
     const state: AppShortcutState = {
       activeView: 'terminal',
       activeWorktreeId: WT,
-      actions: {} as AppShortcutState['actions'],
+      actions: useAppStore.getState(),
       creationLayoutActive: false,
       floatingTerminalEnabled: false,
       floatingTerminalOpen: false,
