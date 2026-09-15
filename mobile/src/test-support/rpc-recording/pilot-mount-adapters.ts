@@ -1,5 +1,9 @@
 import { observableModel } from './observable-model'
+import { hostedReviewMountAdapters } from './hosted-review-mount-adapters'
 import { settingsMountAdapters } from './settings-mount-adapters'
+import { sourceControlMountAdapters } from './source-control-mount-adapters'
+import { taskWorkspaceHookMountAdapters } from './task-workspace-hook-mount-adapters'
+import { taskWorkspaceSenderMountAdapters } from './task-workspace-sender-mount-adapters'
 import { workspaceSettingsMounts } from './workspace-settings-mounts'
 import type { MountAdapter } from './recording-scenario'
 import { hookMount, performHookAction } from './hook-mount'
@@ -13,6 +17,10 @@ export function pilotMountAdapters(
   const adapters: Record<string, MountAdapter> = {
     ...settingsMountAdapters(modules),
     ...workspaceSettingsMounts(modules),
+    ...sourceControlMountAdapters(modules),
+    ...taskWorkspaceSenderMountAdapters(modules),
+    ...taskWorkspaceHookMountAdapters(modules),
+    ...hostedReviewMountAdapters(modules),
     'workspace.file-inventory': ({ client }) => {
       const useSearch = modules.load<
         typeof import('../../session/use-mobile-native-chat-file-search')
@@ -215,6 +223,12 @@ export function pilotMountAdapters(
               // oxlint-disable-next-line typescript/consistent-type-assertions -- SAFETY: the preset arrives from the scenario JSON as a string.
               args.preset as Parameters<typeof actions.persistDefaultGitHubPreset>[0]
             )
+          }
+          if (name === 'resume') {
+            return actions.persistTaskResumeState({ githubItemsPreset: 'issues' })
+          }
+          if (name === 'trust') {
+            return actions.persistSetupHookTrust('repo-1', 'hash-1', false)
           }
           throw new Error(`Unknown preferences action: ${name}`)
         },
