@@ -34,8 +34,8 @@ export function translateShortcutDefinitionTitle(
   if (!direction) {
     return fallback
   }
-  return translate('auto.lib.tabMoveToSplitCopy.shortcutTitle', '{{value0}}: {{value1}}', {
-    value0: translateTabMoveToSplitLabel(),
-    value1: translateTabMoveToSplitDirection(direction)
+  return translate('auto.lib.tabMoveToSplitCopy.shortcutTitle', '{{label}}: {{direction}}', {
+    label: translateTabMoveToSplitLabel(),
+    direction: translateTabMoveToSplitDirection(direction)
   })
 }

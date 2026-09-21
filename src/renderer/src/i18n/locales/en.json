@@ -1003,7 +1003,7 @@
         }
       },
       "tabMoveToSplitCopy": {
-        "shortcutTitle": "{{value0}}: {{value1}}"
+        "shortcutTitle": "{{label}}: {{direction}}"
       },
       "clipboardWriteFailure": {
         "tooLarge": "The text is too large to copy."
