@@ -406,8 +406,47 @@ const MERMAID_PACKAGE = 'node_modules/mermaid/'
  *
  *   modules        4212 -> 4213   (+1)
  *   local modules  1026 -> 1027   (+1)
+ *
+ * Muse then joined the mobile agent catalog with its bundled icon, one more local input to the
+ * shared agent picker.
+ *
+ *   modules        4213 -> 4214   (+1)
+ *   local modules  1027 -> 1028   (+1)
+ *
+ * Muse's worker launch preferences then added `src/shared/agent-session-option-catalog-muse.ts`,
+ * which the option catalog this route already reaches imports. One local module, measured.
+ *
+ *   modules        4214 -> 4215   (+1)
+ *   local modules  1028 -> 1029   (+1)
+ *
+ * The structured tool line then added `src/shared/structured-agent-session-tool-call-block.ts`,
+ * which the projection and live turn this route already reaches import. One local module,
+ * measured; the change was src/shared-only, so its own CI never ran this suite.
+ *
+ *   modules        4215 -> 4216   (+1)
+ *   local modules  1029 -> 1030   (+1)
+ *
+ * The page then took over its own safe area: the bridge client reaches
+ * `bridge/bridge-safe-area-insets.ts`, and the closure gained the page's root layout
+ * (`app/_layout.web.tsx`), which wraps every route. Two local modules, measured.
+ *
+ *   modules        4216 -> 4218   (+2)
+ *   local modules  1030 -> 1032   (+2)
+ *
+ * #22452 (`80f5aae0f9`) then added `src/shared/main-agent-status.ts` and
+ * `src/shared/agent-turn-outcome.ts`, which `agent-status-types.ts` on this route imports. Two local
+ * modules; the change was src/shared-only, so its own CI never ran this suite and main read two over.
+ *
+ *   modules        4218 -> 4220   (+2)
+ *   local modules  1032 -> 1034   (+2)
+ *
+ * Reverting #18790 then took `src/shared/agent-icons/freebuff.png` back out of
+ * `mobile-agent-icon-assets.ts`, undoing the one module #22119 pinned for it. Measured on the revert.
+ *
+ *   modules        4220 -> 4219   (-1)
+ *   local modules  1034 -> 1033   (-1)
  */
-const SESSION_ROUTE_MODULES = 4213
+const SESSION_ROUTE_MODULES = 4219
 
 /** What the page enters this route through once the route is a switch with a `.web.tsx` sibling. */
 const ROUTE_ENTRY = [
