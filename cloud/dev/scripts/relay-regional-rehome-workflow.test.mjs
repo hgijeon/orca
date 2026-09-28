@@ -20,7 +20,7 @@ test('same-cap wrapper is reusable, canary-bound, and sequential', () => {
   assert.match(wrapper, /needs: \[gate, cell_2\]/)
   assert.match(wrapper, /needs: \[gate, cell_3\]/)
   assert.match(job, /on:\n  workflow_call:/)
-  assert.match(job, /c27\|c28\|c29/)
+  assert.match(job, /c27\|c28\|c29\|c30\)/)
   assert.match(job, /EXPECTED_HARD_CAP=3000/)
   assert.match(job, /EXPECTED_REGION=asia-east2/)
   assert.match(job, /--hard-cap "\$\{EXPECTED_HARD_CAP\}"/)
@@ -75,8 +75,15 @@ test('same-cap wrapper is reusable, canary-bound, and sequential', () => {
   )
   assert.match(
     job,
-    /host-drain \\\n {16}--regional-rehome-protocol "\$\{DESIRED_REHOME_PROTOCOL\}" \\\n {16}"\$\{POOL_ARGUMENTS\[@\]\}" \\\n {14}\| jq -e '\.changes == 2' >\/dev\/null/
+    /host-drain \\\n {16}--regional-rehome-protocol "\$\{DESIRED_REHOME_PROTOCOL\}" \\\n {16}"\$\{POOL_ARGUMENTS\[@\]\}"\)"\n {12}echo "\$\{RESUME_REVIEW\}"\n {12}jq -e '\.changes == 2' <<< "\$\{RESUME_REVIEW\}" >\/dev\/null/
   )
+  // A resume applies nothing at all, which is what a resume means: the only accepted
+  // unconverged plan is the template-and-MIG rollback-image drift, and it is left pending.
+  const resumeStep = job.slice(
+    job.indexOf('- name: Require converged Terraform state and a stable MIG on resume'),
+    job.indexOf('- name: Apply only the selected same-cap template and MIG')
+  )
+  assert.equal(resumeStep.split('terraform -chdir=infra/terraform apply').length, 1)
   assert.match(job, /resume requires the isolated migration-only cell/)
   assert.match(job, /test "\$\{TARGET_INCARNATION\}" = "\$\{SOURCE_INCARNATION\}"/)
   assert.match(job, /\(.regionalRehomeProtocol \/\/ 0\) == \$protocol/)

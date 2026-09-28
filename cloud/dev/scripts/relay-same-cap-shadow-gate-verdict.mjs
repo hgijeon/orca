@@ -18,11 +18,13 @@ export const ENTRY_LIMIT = 20000
 export const BASELINE_OFFSET_HOURS = [24, 48]
 
 // The asia-east2 cells share a 16-connection pool at 176 ms RTT, which is where pool pressure
-// shows up first for the whole fleet.
+// shows up first for the whole fleet. A cell joins only once it serves: zero samples read as
+// unverified, so listing a not-yet-general cell would turn every verdict into WARN.
 export const FLEET_POOL_CELL_IDS = [
   'production-gce-c27',
   'production-gce-c28',
-  'production-gce-c29'
+  'production-gce-c29',
+  'production-gce-c30'
 ]
 
 export const SHADOW_GATE_THRESHOLDS = {
@@ -37,7 +39,14 @@ export const SHADOW_GATE_THRESHOLDS = {
   // somewhere; this is how far back of the verify end it reaches instead.
   fallbackWindowMinutes: 30,
   // A read that stalls must not be allowed to spend the job's remaining minutes.
-  readTimeoutMs: 60_000
+  readTimeoutMs: 60_000,
+  // Reads are serialised, so a failure mode that makes every read cost its full retry budget
+  // (an expired credential, a Logging 429 storm) scales with the window, not with one read.
+  // Past this the gate stops reading and reports the rest unverified, which is a verdict; the
+  // step's own timeout-minutes sits above it and exists only for a hung process. Set well clear
+  // of a healthy gate's own serial read time, or ordinary days report unverified tails and the
+  // shadow roll stops measuring the thing it exists to measure. Raise both bounds together.
+  overallDeadlineMs: 420_000
 }
 
 const MINUTE_MS = 60_000

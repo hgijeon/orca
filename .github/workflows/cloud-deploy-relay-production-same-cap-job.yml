@@ -57,9 +57,14 @@ jobs:
       GATE_OVERRIDE_REASON: ${{ inputs.gate-override-reason }}
       GATE_OVERRIDE_CONFIRMATION: ${{ inputs.gate-override-confirmation }}
       OUTPUT_DIRECTORY: ${{ github.workspace }}/relay-monitor-evidence
-      # ~800 controls over 2 min is ~7 re-dials/s per cell, well under the director's
-      # 5 x 80 in-flight assign cap. A cell on an older image ignores it and drains at once.
-      DRAIN_PACE_WINDOW_MS: '120000'
+      # Each drained host re-dials /v1/assign and is re-placed through the director's
+      # single-slot sticky lane, which clears roughly 8 hosts/s fleet-wide. A 2,100-host
+      # cell over 2 min (~18/s) overran it on 2026-09-23 and browned out assign for every
+      # region for ~5 min. 5 min is the cell's maximum window (DRAIN_PACE_WINDOW_MAX_MS); a
+      # ~2,700-host cell still arrives at ~9/s, so expect a short tail, not zero rejects.
+      # The transition wait below is the 15-min migration lease plus this window. A cell on
+      # an older image drains at once.
+      DRAIN_PACE_WINDOW_MS: '300000'
     steps:
       - name: Require exact reusable-workflow configuration
         working-directory: .
@@ -273,7 +278,7 @@ jobs:
               EXPECTED_REGION=us-central1
               EXPECTED_DATABASE_POOL_MAX=
               ;;
-            c27|c28|c29)
+            c27|c28|c29|c30)
               EXPECTED_HARD_CAP=3000
               EXPECTED_REGION=asia-east2
               EXPECTED_DATABASE_POOL_MAX=16
@@ -557,6 +562,10 @@ jobs:
           if test "${ENTRY_ADMISSION}" = migration-only; then
             jq -e '.changed == false' <<< "${ISOLATE_RESULT}" >/dev/null
           fi
+          # The director re-places hosts off a cell only when the isolate stamped it, so a
+          # script too old to ask for the stamp produces today's behaviour and the canary
+          # reads as "the fix did nothing" with nothing to tell that from a wrong premise.
+          jq -e '.rollIsolated == true' <<< "${ISOLATE_RESULT}" >/dev/null
           ISOLATE_GENERATION="$(jq -er '.generation' <<< "${ISOLATE_RESULT}")"
           echo "SELECTOR_GENERATION_AFTER_ISOLATE=${ISOLATE_GENERATION}" >> "${GITHUB_ENV}"
           node dev/scripts/prepare-relay-production-capacity-canary.mjs \
@@ -570,7 +579,7 @@ jobs:
             --unobserved-bound "${EXPECTED_UNOBSERVED_BOUND}" \
             --heartbeat either --admission migration-only --draining required \
             --activity restart-safe --expected-image-digests "${PREDECESSOR_IMAGE_DIGEST}" \
-            --timeout-ms 1020000
+            --timeout-ms 1200000
 
       - id: capacity-auth
         if: ${{ inputs.mode != 'verify' }}
@@ -594,6 +603,10 @@ jobs:
           # Zero resource changes prove the prior run's apply completed and no
           # restart will follow, keeping the incarnation check honest. Root
           # outputs may lag a targeted apply, so judge resource_changes only.
+          # The cell backend service is deliberately not targeted: the capacity role has no
+          # compute.backendServices.update, so naming it fails the apply after the MIG has
+          # rolled. Its drain and log_config settings ship in a root apply by a principal
+          # that holds the permission.
           terraform -chdir=infra/terraform plan \
             -var-file=environments/production.tfvars \
             -var-file="${RUNNER_TEMP}/relay-same-cap.tfvars.json" \
@@ -621,7 +634,7 @@ jobs:
                     | select(.change.actions | any(. != "no-op" and . != "read"))
                     | .address] | join(","))'
             echo 'requiring reviewed rollback-image drift'
-            terraform -chdir=infra/terraform show -json \
+            RESUME_REVIEW="$(terraform -chdir=infra/terraform show -json \
               "${RUNNER_TEMP}/relay-same-cap-resume.tfplan" \
               | node dev/scripts/validate-relay-capacity-plan.mjs \
                 --mode same-cap-cell --cell-id "${TARGET_CELL_ID}" \
@@ -633,8 +646,9 @@ jobs:
                 --rehome-director-service-account "${DIRECTOR_RUNTIME_SERVICE_ACCOUNT}" \
                 --rehome-audience https://relay.onorca.dev/v1/admin/host-drain \
                 --regional-rehome-protocol "${DESIRED_REHOME_PROTOCOL}" \
-                "${POOL_ARGUMENTS[@]}" \
-              | jq -e '.changes == 2' >/dev/null
+                "${POOL_ARGUMENTS[@]}")"
+            echo "${RESUME_REVIEW}"
+            jq -e '.changes == 2' <<< "${RESUME_REVIEW}" >/dev/null
           fi
           gcloud compute instance-groups managed wait-until "${MIG_NAME}" --stable \
             --project "${GCP_PROJECT_ID}" --zone "${TARGET_ZONE}" --timeout 900
@@ -822,6 +836,15 @@ jobs:
         id: shadow-gate
         if: ${{ inputs.mode != 'verify' }}
         continue-on-error: true
+        # continue-on-error bounds this step's contribution to the job outcome, not its clock,
+        # and its reads are serialised. A timed-out step is a failed step, which continue-on-error
+        # absorbs; without this bound a Logging 429 storm or an expired credential makes every
+        # read cost its full retry budget and can push the job past timeout-minutes, and a
+        # cancelled job takes the whole wave with it. A healthy gate is already minutes of
+        # serial reads, so both bounds sit above that: the script settles at seven minutes and
+        # reaching this eight is the pathological case. Eight on top of a ~14-minute cell still
+        # leaves the job's 75 minutes intact.
+        timeout-minutes: 8
         env:
           DRAIN_STARTED_AT: ${{ steps.drain.outputs.drain-started-at }}
           APPLY_STARTED_AT: ${{ steps.apply.outputs.apply-started-at }}
@@ -846,6 +869,8 @@ jobs:
       - name: Publish the shadow health gate verdict
         if: ${{ inputs.mode != 'verify' }}
         continue-on-error: true
+        # One small JSON file; a retrying upload must not spend the wave's remaining minutes either.
+        timeout-minutes: 2
         uses: actions/upload-artifact@v4
         with:
           name: relay-same-cap-shadow-gate-${{ inputs.target-cell-id }}-${{ github.run_id }}.json
@@ -875,6 +900,9 @@ jobs:
             --director-origin "${DIRECTOR_ORIGIN}" --cell-origin "${CELL_ORIGIN}" \
             --cell-id "${TARGET_CELL_ID}" --approved-cells same-cap --mode isolate)"
           echo "${ISOLATE_RESULT}"
+          # Same reason as the isolate step above: a failed wave leaves this cell isolated
+          # deliberately, and the stamp is what lets its hosts leave.
+          jq -e '.rollIsolated == true' <<< "${ISOLATE_RESULT}" >/dev/null
           # The isolate result carries the authoritative post-isolate generation;
           # fixed offsets are wrong whenever an earlier isolate was a no-op.
           FAILSAFE_GENERATION="$(jq -er '.generation' <<< "${ISOLATE_RESULT}")"
