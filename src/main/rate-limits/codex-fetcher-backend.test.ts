@@ -131,8 +131,7 @@ describe('Codex backend rate-limit requests', () => {
 
     await expect(
       fetchCodexRateLimits({
-        codexHomePath: '\\\\wsl.localhost\\Ubuntu\\home\\alice\\.local\\share\\orca\\account\\home',
-        allowPtyFallback: false
+        codexHomePath: '\\\\wsl.localhost\\Ubuntu\\home\\alice\\.local\\share\\orca\\account\\home'
       })
     ).resolves.toMatchObject({ status: 'error', error: 'RPC failed' })
     expect(childSpawnMock).toHaveBeenCalled()
