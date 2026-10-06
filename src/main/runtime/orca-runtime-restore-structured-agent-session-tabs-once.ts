@@ -125,7 +125,11 @@ export class OrcaRuntimeWithRestoreStructuredAgentSessionTabsOnce extends OrcaRu
       await host
         .setSessionTabVisibility(input.sessionId, true, ...(input.tabId ? [input.tabId] : []))
         .catch((error: unknown) => {
-          console.warn('[structured-agent-session] recording an opened chat tab failed', error)
+          host.deps.logger.warn('recording an opened chat tab failed', {
+            scope: 'tab-visibility-open',
+            sessionId: input.sessionId,
+            error
+          })
         })
     }
     this.projectStructuredAgentSessionTab(input)
@@ -255,9 +259,10 @@ export class OrcaRuntimeWithRestoreStructuredAgentSessionTabsOnce extends OrcaRu
   async searchRepoRefs(
     repoSelector: string,
     query: string,
-    limit = DEFAULT_REPO_SEARCH_REFS_LIMIT
+    limit = DEFAULT_REPO_SEARCH_REFS_LIMIT,
+    includeQualifiedRefs = true
   ): Promise<RuntimeRepoSearchRefs> {
-    return this.repositoryRefQueries.search(repoSelector, query, limit)
+    return this.repositoryRefQueries.search(repoSelector, query, limit, includeQualifiedRefs)
   }
 
   protected async resolveHostedReviewTarget(args: {

@@ -12,6 +12,7 @@
 
 import type { AgentJournalSubmission } from '../../../shared/agent-session-journal-types'
 import type { AgentSessionRecord } from '../../../shared/agent-session-record'
+import type { AgentChildWorkView } from '../../../shared/agent-status-child-work-view'
 import {
   agentSessionFailureFact,
   type SubmissionRejectionFact
@@ -21,6 +22,7 @@ import {
   type AgentSessionFailureWordsContext
 } from '../../../shared/agent-session-failure-words'
 import type { StructuredAgentSessionAdapter } from './structured-agent-session-adapter'
+import type { StructuredAgentRegistry } from './structured-agent-registry'
 import {
   structuredAgentSessionStartFailure,
   type StructuredAgentSessionStartFailureCause
@@ -39,10 +41,12 @@ import {
 import { failedProviderChildStart } from './structured-agent-session-provider-child'
 import { handOverSubmission } from './structured-agent-session-turns'
 import { structuredAgentSessionCommandRunning } from './structured-agent-session-command-turn'
+import type { StructuredAgentSessionLogger } from './structured-agent-session-logger'
 
 export type StructuredAgentSessionDeliveryLoopDeps = {
   sessions: ReadonlyMap<string, StructuredAgentSessionHostSession>
   adapter: StructuredAgentSessionAdapter
+  agents: StructuredAgentRegistry
   serialize: <T>(sessionId: string, task: () => Promise<T>) => Promise<T>
   /** A start step, tracked from enqueue so quit waits for the child it may produce. */
   trackStart: <T>(start: Promise<T>) => Promise<T>
@@ -61,9 +65,9 @@ export type StructuredAgentSessionDeliveryLoopDeps = {
   ) => Promise<boolean>
   /** Who the chat's failure sentences name. */
   failureTextContext: (sessionId: string) => AgentSessionFailureWordsContext
-  onError: (sessionId: string, error: unknown) => void
+  logger: StructuredAgentSessionLogger
   record: (sessionId: string) => AgentSessionRecord | null
-  flushStreamedEvents: (sessionId: string) => Promise<void>
+  readChildWork: (sessionId: string) => readonly AgentChildWorkView[] | undefined
   now: () => number
 }
 
@@ -112,10 +116,8 @@ export class StructuredAgentSessionDeliveryLoop {
           return
         }
         if (!prepared.ok) {
-          const { refusal, diagnostic } = prepared
-          const cause = { refusal, ...(diagnostic ? { diagnostic } : {}) }
           await this.deps.serialize(sessionId, () =>
-            this.fail(sessionId, { startKey: null, cause })
+            this.fail(sessionId, this.refusedStart(sessionId, prepared))
           )
           return
         }
@@ -131,14 +133,22 @@ export class StructuredAgentSessionDeliveryLoop {
       }
     } catch (error) {
       // The error is Orca's own and goes to the log; the chat says only that Orca failed.
-      this.deps.onError(sessionId, error)
+      this.deps.logger.warn('delivering a queued message failed', {
+        scope: 'delivery-loop',
+        sessionId,
+        error
+      })
       const cause = { hostFault: true } as const
       await this.deps
         .serialize(sessionId, () => this.fail(sessionId, { startKey: null, cause }))
         .catch((failure: unknown) => {
           // Rows left queued are rejected by the next open, or by the next loop an accept wakes.
           this.running.delete(sessionId)
-          this.deps.onError(sessionId, failure)
+          this.deps.logger.warn('recording a failed delivery failed', {
+            scope: 'delivery-loop-fail',
+            sessionId,
+            error: failure
+          })
         })
     }
   }
@@ -170,6 +180,11 @@ export class StructuredAgentSessionDeliveryLoop {
       return this.fail(sessionId, failedStart)
     }
     const ready = await this.deps.ensureProviderChild(sessionId, oldest.clientMessageId)
+    if (!ready.ok && ready.refusal.details?.reason === 'previousExitUnverifiable') {
+      // Failed in the step that was refused: a message accepted, or an exit proven, after it must
+      // not be failed for a verdict that no longer holds.
+      return this.fail(sessionId, this.refusedStart(sessionId, ready))
+    }
     if (!ready.ok) {
       return ready
     }
@@ -225,15 +240,33 @@ export class StructuredAgentSessionDeliveryLoop {
         journal: session.journal,
         fence: awaitedChild.fence,
         adapter: this.deps.adapter,
+        agents: this.deps.agents,
         providerChildPhase: () => this.deps.sessions.get(sessionId)?.child?.phase,
         failureTextContext: this.deps.failureTextContext(sessionId),
         record: () => this.deps.record(sessionId),
-        flushStreamedEvents: () => this.deps.flushStreamedEvents(sessionId),
+        childWork: () => this.deps.readChildWork(sessionId),
         now: this.deps.now
       },
       next
     )
     return 'continue'
+  }
+
+  /** A start the session refused, as the failure every queued message it was for is rejected with. */
+  private refusedStart(
+    sessionId: string,
+    { refusal, diagnostic }: Extract<StructuredAgentSessionResumeOutcome, { ok: false }>
+  ): StartFailure {
+    // A conversation no agent ever ran, such as a cleared chat's, failed to start, not restart.
+    const newSession = this.deps.record(sessionId)?.providerHandleChain.length === 0
+    return {
+      startKey: null,
+      cause: {
+        refusal,
+        ...(diagnostic ? { diagnostic } : {}),
+        ...(newSession ? { newSession: true as const } : {})
+      }
+    }
   }
 
   private async fail(sessionId: string, failure: StartFailure): Promise<'stop'> {
