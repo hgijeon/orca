@@ -13,7 +13,6 @@
 import type { PermissionMode } from '@anthropic-ai/claude-agent-sdk'
 import { existsSync } from 'node:fs'
 import type { AgentSessionRecord } from '../../shared/agent-session-record'
-import { DISPATCH_DOUBT_PROVIDER_IDLE } from '../native-chat/agent-session-journal/journal-dispatch-doubt-reasons'
 import type { AgentSessionResumeTrigger } from '../../shared/agent-session-resume-marker'
 import {
   structuredAgentSessionTeardownTrigger,
@@ -28,11 +27,14 @@ import {
   type CodexStructuredSessionAdapterDeps
 } from '../codex/codex-structured-session-adapter'
 import type { ClaudeStructuredSessionAdapterDeps } from '../claude/claude-structured-session-adapter'
+import { CODEX_STRUCTURED_AGENT } from '../codex/codex-structured-agent-definition'
+import { CLAUDE_STRUCTURED_AGENT } from '../claude/claude-structured-agent-definition'
 import {
   StructuredAgentSessionHost,
   type StructuredAgentSessionHostDeps
 } from '../native-chat/agent-session-wire/structured-agent-session-host'
 import { StructuredAgentSessionAdapterRouter } from '../native-chat/agent-session-wire/structured-agent-session-adapter-router'
+import { StructuredAgentRegistry } from '../native-chat/agent-session-wire/structured-agent-registry'
 import { setStructuredAgentSessionHost } from '../native-chat/agent-session-wire/structured-agent-session-registry'
 import {
   readClaudeManagedAccountGateSettings,
@@ -53,7 +55,12 @@ import { createStructuredAgentEnvironmentResolvers } from './structured-agent-sh
 import type { ClaudeStructuredAuthPolicy } from '../claude-accounts/claude-structured-auth-policy'
 import { createStructuredClaudeRuntimeAdapter } from './structured-claude-runtime-adapter'
 import { createStructuredAgentSessionLifecycleDelivery } from './structured-agent-session-lifecycle-delivery'
+import { createStructuredAgentSessionDispatchFollowUps } from './structured-agent-session-dispatch-followups'
 import { agentModelCatalogStore } from '../native-chat/agent-model-catalog/agent-model-catalog-store'
+import {
+  neverThrowingStructuredAgentSessionLogger,
+  type StructuredAgentSessionLogger
+} from '../native-chat/agent-session-wire/structured-agent-session-logger'
 import {
   modelCatalogHostDeps,
   type RuntimeAgentAccountHomeResolver
@@ -113,7 +120,9 @@ export type StructuredAgentSessionRuntimeDeps = {
   /** Which login-shell variables Codex and Claude children inherit; absent inherits all. */
   resolveShellEnvironmentPolicy?: () => NativeChatShellEnvironmentPolicy
   resolveCodexOverrides?: () => NodeJS.ProcessEnv
-  onError?: (input: { scope: string; error: unknown }) => void
+  /** Where every failure the runtime and its host carry on past is reported. Required, so no path
+   *  can drop one: the desktop and headless hosts both pass the trace-file logger. */
+  logger: StructuredAgentSessionLogger
   /** Every structured-session status projection, for host-side reactions such as the first-work
    *  workspace rename that CLI agents get from their hooks. */
   onSessionStatusChanged?: StructuredAgentSessionHostDeps['onSessionStatusChanged']
@@ -131,6 +140,11 @@ let installing: Promise<InstalledRuntime> | null = null
 /** Thrown when the host is installed without a Claude auth policy resolver. */
 export const CLAUDE_STRUCTURED_AUTH_POLICY_REQUIRED =
   'structured agent-session host requires a Claude auth policy resolver'
+
+/** Thrown when the host is installed without a logger: every failure it carries on past would
+ *  otherwise reach nobody. */
+export const STRUCTURED_AGENT_SESSION_LOGGER_REQUIRED =
+  'structured agent-session host requires a logger'
 
 /**
  * Runtimes whose teardown did not finish. `installing` is cleared regardless so
@@ -206,16 +220,18 @@ async function install(deps: StructuredAgentSessionRuntimeDeps): Promise<Install
   if (typeof deps.resolveClaudeAuthPolicy !== 'function') {
     throw new Error(CLAUDE_STRUCTURED_AUTH_POLICY_REQUIRED)
   }
+  const declared: Partial<StructuredAgentSessionLogger> | undefined = deps.logger
+  if (typeof declared?.warn !== 'function' || typeof declared.error !== 'function') {
+    throw new Error(STRUCTURED_AGENT_SESSION_LOGGER_REQUIRED)
+  }
+  const logger = neverThrowingStructuredAgentSessionLogger(deps.logger)
   const journalDatabase = await openStructuredAgentSessionJournalDatabase({
     stateDirectory: deps.stateDirectory,
     hostId: deps.hostId,
-    onLegacyRecordImportReport: (report) =>
-      deps.onError
-        ? deps.onError({ scope: 'structured-agent-session-record-import', error: report })
-        : console.warn('[structured-agent-session] importing the chat records file', report)
+    logger
   })
   try {
-    return await installOnJournal(deps, journalDatabase)
+    return await installOnJournal({ ...deps, logger }, journalDatabase)
   } catch (error) {
     // Nothing else holds the connection yet, and the next install opens its own.
     journalDatabase.close()
@@ -233,35 +249,13 @@ async function installOnJournal(
   let host: StructuredAgentSessionHost | null = null
   const lifecycle = createStructuredAgentSessionLifecycleDelivery({
     handle: (event) => host?.handleAdapterEvent(event),
-    ...(deps.onError ? { onError: deps.onError } : {}),
+    logger: deps.logger,
     // Claude publishes an observed exit only after its close ladder and transcript write; Codex
     // publishes inside its own exit callback and needs nothing.
     drainObservedExits: () => claude.drainObservedExits()
   })
-  const onDispatchSettledLate = (
-    settlement: Parameters<StructuredAgentSessionHost['settleLateDispatch']>[0]
-  ): void => {
-    void host?.settleLateDispatch(settlement).catch((error) =>
-      deps.onError?.({
-        scope: `structured-agent-session-late-settlement:${settlement.sessionId}`,
-        error
-      })
-    )
-  }
-  // The provider going idle is what re-derives a doubted send; a late echo still accepts it.
-  const releaseUnansweredDispatches = ({ sessionId }: { sessionId: string }): void => {
-    void host
-      ?.releaseUnansweredDispatches({
-        sessionId,
-        reason: DISPATCH_DOUBT_PROVIDER_IDLE
-      })
-      .catch((error) =>
-        deps.onError?.({
-          scope: `structured-agent-session-unanswered-dispatch:${sessionId}`,
-          error
-        })
-      )
-  }
+  const { onDispatchSettledLate, releaseUnansweredDispatches } =
+    createStructuredAgentSessionDispatchFollowUps({ host: () => host, logger: deps.logger })
   const codex = new CodexStructuredSessionAdapter({
     resolveLaunch: createCodexStructuredLaunchResolver({
       store,
@@ -275,14 +269,14 @@ async function installOnJournal(
     ...(deps.openCodexConnection ? { openConnection: deps.openCodexConnection } : {}),
     ...(deps.readProcessStartTime ? { readProcessStartTime: deps.readProcessStartTime } : {}),
     modelCatalog: agentModelCatalogStore,
-    onBackgroundTasksChanged: (sessionId, state) =>
-      host?.publishBackgroundTaskState(sessionId, state),
     onChildWorkEvidence: (sessionId, evidence) =>
       host?.publishChildWorkEvidence(sessionId, evidence),
     onDispatchSettledLate,
     onPrimaryThreadStoppedRunning: releaseUnansweredDispatches,
+    logger: deps.logger,
     onEvent: (event) => {
-      if (event.type === 'ended' && 'cause' in event && event.cause === 'unexpected-exit') {
+      // Every exit, expected or not: the host ends that child's record.
+      if (event.type === 'ended' && 'cause' in event) {
         lifecycle.deliver(event)
       }
     }
@@ -304,8 +298,7 @@ async function installOnJournal(
         }
       : {}),
     onLifecycleEvent: (event) => lifecycle.deliver(event),
-    onBackgroundTasksChanged: (sessionId, state) =>
-      host?.publishBackgroundTaskState(sessionId, state),
+    logger: deps.logger,
     onChildWorkEvidence: (sessionId, evidence) =>
       host?.publishChildWorkEvidence(sessionId, evidence),
     onDispatchSettledLate,
@@ -314,12 +307,17 @@ async function installOnJournal(
     ...(deps.readProcessStartTime ? { readProcessStartTime: deps.readProcessStartTime } : {}),
     modelCatalog: agentModelCatalogStore
   })
-  const adapter = new StructuredAgentSessionAdapterRouter({ codex, claude }, async () => {
+  const agents = new StructuredAgentRegistry([
+    { definition: CODEX_STRUCTURED_AGENT, adapter: codex },
+    { definition: CLAUDE_STRUCTURED_AGENT, adapter: claude }
+  ])
+  const adapter = new StructuredAgentSessionAdapterRouter(agents, async () => {
     await Promise.all([codex.closeAll(), claude.closeAll()])
   })
   host = new StructuredAgentSessionHost({
     store,
     adapter,
+    agents,
     recoveryCapsule: new AgentSessionRecoveryCapsule(deps.stateDirectory),
     journalDatabase,
     claimKeyId: deps.claimKeyId,
@@ -331,12 +329,7 @@ async function installOnJournal(
             await deps.resolveLaunchArgs!(provider)
         }
       : {}),
-    onEventSinkError: ({ sessionId, error }) =>
-      deps.onError?.({ scope: `structured-agent-session-journal:${sessionId}`, error }),
-    onLeaseReconcileFailure: (error) =>
-      deps.onError
-        ? deps.onError({ scope: 'structured-agent-session-lease-reconcile', error })
-        : console.warn('[structured-agent-session] reconciling chat leases failed', error),
+    logger: deps.logger,
     ...(deps.onSessionStatusChanged ? { onSessionStatusChanged: deps.onSessionStatusChanged } : {}),
     ...(deps.statusSink ? { statusSink: deps.statusSink } : {}),
     ...(deps.hasOpenDispatch ? { hasOpenDispatch: deps.hasOpenDispatch } : {}),
