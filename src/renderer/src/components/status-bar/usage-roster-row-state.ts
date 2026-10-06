@@ -17,7 +17,7 @@ const CONFIRMED_SIGN_OUT_PATTERNS = [
   /\bplease reauthenticate\b/i
 ]
 
-function isConfirmedSignedOut(provider: ProviderRateLimits): boolean {
+export function isConfirmedSignedOut(provider: ProviderRateLimits): boolean {
   if (provider.usageMetadata?.failureKind === 'missing-credentials') {
     return true
   }
@@ -34,7 +34,7 @@ export function getUsageRosterRowState(
   provider: ProviderRateLimits,
   hasUsage: boolean
 ): UsageRosterRowState {
-  if (provider.isUnlimited) {
+  if (provider.isUnlimited && !isConfirmedSignedOut(provider)) {
     return {
       kind: 'unlimited',
       statusLabel: translate(
