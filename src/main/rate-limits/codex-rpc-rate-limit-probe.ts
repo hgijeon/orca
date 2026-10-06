@@ -12,6 +12,7 @@ import {
   CODEX_WEEKLY_WINDOW_MINUTES,
   type CodexRateLimitWindowsSnapshot
 } from './codex-rate-limit-window-classification'
+import { mapCodexCredits } from './codex-credit-balance'
 import type { CodexRateLimitFetchOptions } from './codex-rate-limit-fetch-options'
 import { abortedCodexRateLimitResult } from './codex-rate-limit-fetch-result'
 import { mapCodexRateLimitWindow } from './codex-rate-limit-window-mapper'
@@ -31,7 +32,6 @@ type RpcResponse = {
 type RpcRateLimitsResponse = {
   rateLimits?:
     | (CodexRateLimitWindowsSnapshot & {
-        credits?: { unlimited?: boolean } | null
         planType?: string | null
       })
     | null
@@ -252,6 +252,7 @@ export function readCodexRateLimitsViaRpc(
           const session = mapCodexRateLimitWindow(classified.session, CODEX_SESSION_WINDOW_MINUTES)
           const weekly = mapCodexRateLimitWindow(classified.weekly, CODEX_WEEKLY_WINDOW_MINUTES)
           const credits = mapRpcRateLimitResetCredits(wrapper?.rateLimitResetCredits)
+          const extraUsage = mapCodexCredits(rateLimits?.credits)
           const planType =
             typeof rateLimits?.planType === 'string' ? rateLimits.planType.trim() : undefined
           const isUnlimited = rateLimits?.credits?.unlimited === true
@@ -277,6 +278,7 @@ export function readCodexRateLimitsViaRpc(
               ...(credits !== undefined ? { rateLimitResetCredits: credits } : {}),
               ...(planType ? { planType } : {}),
               ...(isUnlimited ? { isUnlimited: true } : {}),
+              ...(extraUsage ? { extraUsage } : {}),
               updatedAt: Date.now(),
               error: null,
               status: 'ok'
