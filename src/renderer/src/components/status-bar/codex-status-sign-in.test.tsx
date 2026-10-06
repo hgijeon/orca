@@ -267,6 +267,24 @@ describe('status bar Codex sign-in action', () => {
     expect(screen.queryByText('Sign in to see usage')).toBeNull()
   })
 
+  it.each([
+    { error: 'ChatGPT authentication required to read rate limits' },
+    { error: null, usageMetadata: { failureKind: 'missing-credentials' as const } }
+  ])('offers working sign-in over cached unlimited usage: %j', async (failure) => {
+    inactiveUsage = { ...unavailableUsage, isUnlimited: true, ...failure }
+    reauthenticate.mockResolvedValue(codexSnapshot('account-2'))
+
+    await renderSwitcherAndOpenAccounts('System default')
+    expect(screen.queryByText('Unlimited')).toBeNull()
+    fireEvent.click(screen.getByRole('button', { name: /Sign in/ }))
+
+    await waitFor(() => expect(toastSuccess).toHaveBeenCalledOnce())
+    expect(reauthenticate).toHaveBeenCalledWith({
+      accountId: 'account-2',
+      activateIfSelectionWasEmpty: true
+    })
+  })
+
   it('activates the signed-in account and runs the same restart workflow a switch runs', async () => {
     reauthenticate.mockResolvedValue(codexSnapshot('account-2'))
 

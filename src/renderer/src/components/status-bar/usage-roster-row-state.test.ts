@@ -104,6 +104,33 @@ describe('getUsageRosterRowState', () => {
     ).toEqual({ kind: 'unlimited', statusLabel: 'Unlimited' })
   })
 
+  it.each([
+    { error: 'ChatGPT authentication required to read rate limits' },
+    { usageMetadata: { failureKind: 'missing-credentials' as const } }
+  ])('offers sign-in over cached unlimited usage: %j', (failure) => {
+    expect(
+      getUsageRosterRowState(
+        provider({ provider: 'codex', isUnlimited: true, status: 'error', ...failure }),
+        false
+      )
+    ).toEqual({ kind: 'sign-in', statusLabel: 'not signed in' })
+  })
+
+  it.each([
+    { error: 'temporary refresh failure' },
+    {
+      error: 'authentication required',
+      usageMetadata: { failureKind: 'stale-token' as const }
+    }
+  ])('keeps unlimited usage for transient failures: %j', (failure) => {
+    expect(
+      getUsageRosterRowState(
+        provider({ provider: 'codex', isUnlimited: true, status: 'error', ...failure }),
+        false
+      )
+    ).toEqual({ kind: 'unlimited', statusLabel: 'Unlimited' })
+  })
+
   it('distinguishes unavailable and empty successful responses', () => {
     expect(
       getUsageRosterRowState(

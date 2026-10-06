@@ -11,6 +11,7 @@ import { useResetCountdownClock } from '@/hooks/useResetCountdownClock'
 import { barColor, clampUsedPercent } from './tooltip'
 import { formatRateLimitWindowChipLabel } from '@/lib/window-label-formatter'
 import { formatUsagePercentageLabel } from './usage-percentage-label'
+import { isConfirmedSignedOut } from './usage-roster-row-state'
 import { translate } from '@/i18n/i18n'
 
 export function InlineUsageBars({
@@ -86,6 +87,9 @@ export function InlineUsageBars({
 }
 
 export function isUnavailableInactiveUsage(limits: ProviderRateLimits | null | undefined): boolean {
+  if (limits && isConfirmedSignedOut(limits)) {
+    return true
+  }
   return (
     limits?.status === 'error' &&
     !limits.isUnlimited &&
