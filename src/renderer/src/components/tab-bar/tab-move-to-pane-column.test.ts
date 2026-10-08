@@ -2,6 +2,7 @@ import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { useAppStore } from '../../store'
 import type { Tab } from '../../../../shared/tab-types'
 import {
+  canMoveTabToNewPaneColumn,
   moveTabToNewPaneColumn,
   resolveActiveTabPaneColumnMoveTarget,
   resolveTabPaneColumnMoveTarget
@@ -67,6 +68,7 @@ describe('tab-move-to-pane-column', () => {
   })
 
   it('resolves an executable target once', () => {
+    expect(canMoveTabToNewPaneColumn('tab-b', 'group-1')).toBe(true)
     expect(resolveTabPaneColumnMoveTarget(useAppStore.getState(), 'tab-b', 'group-1')).toEqual({
       worktreeId: WT,
       unifiedTabId: 'tab-b',
@@ -89,6 +91,7 @@ describe('tab-move-to-pane-column', () => {
     })
 
     expect(resolveTabPaneColumnMoveTarget(useAppStore.getState(), 'tab-a', 'group-1')).toBeNull()
+    expect(canMoveTabToNewPaneColumn('tab-a', 'group-1')).toBe(false)
     expect(resolveActiveTabPaneColumnMoveTarget(useAppStore.getState())).toBeNull()
   })
 

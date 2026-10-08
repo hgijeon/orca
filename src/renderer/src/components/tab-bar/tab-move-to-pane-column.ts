@@ -47,6 +47,10 @@ export function resolveTabPaneColumnMoveTarget(
     : null
 }
 
+export function canMoveTabToNewPaneColumn(unifiedTabId: string, groupId: string): boolean {
+  return resolveTabPaneColumnMoveTarget(useAppStore.getState(), unifiedTabId, groupId) !== null
+}
+
 /** Resolves the active unified tab rather than the terminal entity id stored globally. */
 export function resolveActiveTabPaneColumnMoveTarget(
   state: TabMovePaneColumnState &
